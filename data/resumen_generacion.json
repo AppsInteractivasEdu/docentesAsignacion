@@ -1,0 +1,150 @@
+{
+ "fecha": "2026-11-07T22:57:12.832Z",
+ "stats": {
+  "programas": 11,
+  "total": 356,
+  "porEstado": {
+   "Asignación propuesta": 242,
+   "Asignación aprobada": 0,
+   "Pendiente por designar": 21,
+   "Perfil no disponible": 41,
+   "Pendiente de validación": 35,
+   "Pendiente de validación documental": 0,
+   "Pendiente de autorización del Director": 17
+  },
+  "conDocente": 277,
+  "pendientes": 21,
+  "sinPerfil": 41,
+  "docentes": 132,
+  "totalPerfilesRegenerados": 239,
+  "totalAlertasPerfiles": 13
+ },
+ "archivos": [
+  {
+   "tipo": "Plan de estudios",
+   "nombre": "PLan de estudio consolidado (plan de transición).xlsx",
+   "detalle": "Plan de transición · hoja \"Plan de estudio consolidado\" · 542 filas",
+   "filas": 542,
+   "tamano": 28942,
+   "cargado": "2026-09-01T21:24:28.114Z",
+   "huella": "49690ccb109866b4"
+  },
+  {
+   "tipo": "Plan de estudios",
+   "nombre": "Planes de estudio Licenciaturas anteriores.xlsx",
+   "detalle": "Plan anterior · hoja \"Datos_Programas\" · 522 filas",
+   "filas": 522,
+   "tamano": 26418,
+   "cargado": "2026-09-01T22:05:58.585Z",
+   "huella": "075c5ec809c485bb"
+  },
+  {
+   "tipo": "Profesores – formación académica",
+   "nombre": "Formación académica.xlsx",
+   "detalle": "hoja \"Report\" · 8169 registros · 2706 personas",
+   "filas": 8169,
+   "tamano": 1322192,
+   "cargado": "2026-08-31T19:49:29.337Z",
+   "huella": "ffb6c88672bc6ec7"
+  },
+  {
+   "tipo": "Profesores – experiencia",
+   "nombre": "General Detalla Experiencia.xlsx",
+   "detalle": "hoja \"Report\" · 59669 registros · 2738 personas",
+   "filas": 59669,
+   "tamano": 4494052,
+   "cargado": "2026-08-29T16:42:22.980Z",
+   "huella": "b146a050c15b2ae0"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Lic en Etnoeducacion.pdf",
+   "detalle": "Licenciatura en Etnoeducación · 24 perfiles",
+   "filas": 24,
+   "tamano": 248376,
+   "cargado": "2026-11-07T22:19:06.309Z",
+   "huella": "d3d29d8e2d895884"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Lic en Literatura y Lengua Castellana.pdf",
+   "detalle": "Licenciatura en Literatura y Lengua Castellana · 26 perfiles",
+   "filas": 26,
+   "tamano": 235306,
+   "cargado": "2026-11-07T22:19:28.368Z",
+   "huella": "bcdf0c8e5eb53733"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Lic en Matematicas.pdf",
+   "detalle": "Licenciatura en Matemáticas · 27 perfiles",
+   "filas": 27,
+   "tamano": 227807,
+   "cargado": "2026-11-07T22:19:50.461Z",
+   "huella": "839ea2c418038da3"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Lic en Quimica.pdf",
+   "detalle": "Licenciatura en Química · 23 perfiles",
+   "filas": 23,
+   "tamano": 202876,
+   "cargado": "2026-11-07T22:20:10.524Z",
+   "huella": "2bb349af49993dac"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Lic. Ciencias Naturales Y EA.pdf",
+   "detalle": "Licenciatura en Ciencias Naturales y Educación Ambiental · 22 perfiles",
+   "filas": 22,
+   "tamano": 280999,
+   "cargado": "2026-11-07T22:20:33.353Z",
+   "huella": "1a3dd8f158455886"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Lic. en Artes.pdf",
+   "detalle": "Licenciatura en Artes · 22 perfiles",
+   "filas": 22,
+   "tamano": 249346,
+   "cargado": "2026-11-07T22:20:53.766Z",
+   "huella": "a5e73fc4dad7f032"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Lic. en Educ. Campesina y Rural.pdf",
+   "detalle": "Licenciatura en Educación Campesina y Rural · 32 perfiles",
+   "filas": 32,
+   "tamano": 251171,
+   "cargado": "2026-11-07T22:21:15.289Z",
+   "huella": "7698f55d304ca149"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Lic. en Educ. Infantil.pdf",
+   "detalle": "Licenciatura en Educación Infantil · 19 perfiles",
+   "filas": 19,
+   "tamano": 277612,
+   "cargado": "2026-11-07T22:21:33.591Z",
+   "huella": "74bf9d7824032314"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Lic. Lenguas Extranjeras con enfasis en Ingles.pdf",
+   "detalle": "Licenciatura en Lenguas Extranjeras con Énfasis en Inglés · 25 perfiles",
+   "filas": 25,
+   "tamano": 240699,
+   "cargado": "2026-11-07T22:21:52.351Z",
+   "huella": "ca724fba3ba2e7e5"
+  },
+  {
+   "tipo": "Perfiles docentes",
+   "nombre": "Perfil docente Licenciatura en Tecnologia.pdf",
+   "detalle": "Licenciatura en Tecnología · 19 perfiles",
+   "filas": 19,
+   "tamano": 193913,
+   "cargado": "2026-11-07T22:22:15.808Z",
+   "huella": "fc42d135b1460b27"
+  }
+ ]
+}
