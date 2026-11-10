@@ -1118,6 +1118,12 @@
     const ext = f7.cargaExt || new Map();
     const histPorProg = new Map();
     hist.forEach(h => { if (!histPorProg.has(h.progN)) histPorProg.set(h.progN, []); histPorProg.get(h.progN).push(h); });
+    // Las asignaturas del componente Pedagógico (Plan anterior) son transversales: se dictan en
+    // grupos compartidos entre varios programas y en el histórico 2026-II quedan registradas bajo
+    // "Facultad Ciencias de la Educación", no bajo cada licenciatura. Por eso, para continuidad (NO
+    // para PPI, que tiene su propia restricción de progresión por nivel dentro del programa), la
+    // búsqueda de antecedente también revisa esas filas de Facultad.
+    const filasFacultad = histPorProg.get(progN('Facultad Ciencias de la Educación')) || [];
     const horasMax = cfg.maxHoras === 8 ? 'ocho (8)' : String(cfg.maxHoras);
     const extDe = id => ext.get(cedula(id)) || 0;
     const cargaTot = id => (carga.get(id) || 0) + extDe(id);
@@ -1140,7 +1146,7 @@
           rows.filter(h => h.nivel === prev).forEach(h => out.push({ id: h.id, t: 'progresión', h }));
           rows.filter(h => h.nivel === l).forEach(h => out.push({ id: h.id, t: 'continuidad', h }));
         }
-      } else rows.filter(h => mismaAsig(c, h)).forEach(h => out.push({ id: h.id, t: 'continuidad', h }));
+      } else rows.concat(filasFacultad).filter(h => mismaAsig(c, h)).forEach(h => out.push({ id: h.id, t: 'continuidad', h }));
       const vistos = new Set();
       return out.filter(o => { if (vistos.has(o.id)) return false; vistos.add(o.id); return true; });
     };
@@ -1262,10 +1268,13 @@
       // Fase 7: tipo de asignación (continuidad / progresión / nueva), antecedentes y carga total proyectada
       const f = r.f7 || (r.f7 = { bloqueos: [], dir: [], doc: [] });
       const rowsP = histPorProg.get(progN(c.programa)) || [];
-      f.prev26 = [...new Set(rowsP.filter(x => mismaAsig(c, x)).map(x => x.nombre))];
+      // Para continuidad (no para PPI, ver nota junto a filasFacultad más arriba) también se
+      // busca antecedente entre las filas de "Facultad Ciencias de la Educación".
+      const rowsBusqueda = esPPIc(c) ? rowsP : rowsP.concat(filasFacultad);
+      f.prev26 = [...new Set(rowsBusqueda.filter(x => mismaAsig(c, x)).map(x => x.nombre))];
       f.tipo = prof ? 'nueva' : 'pendiente'; f.origen = null;
       if (prof && hist.length) {
-        const mine = rowsP.filter(x => x.id === prof.id);
+        const mine = rowsBusqueda.filter(x => x.id === prof.id);
         if (esPPIc(c)) {
           const l = nivelPPI(c.asignatura), prev = l === 1 ? 6 : l - 1;
           const hp = l && mine.find(x => x.nivel === prev), hc = l && mine.find(x => x.nivel === l);

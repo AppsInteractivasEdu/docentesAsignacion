@@ -1,1 +1,6 @@
 node_modules/
+
+# Archivos fuente con datos personales de docentes/estudiantes (plan, formación,
+# experiencia, asignación 2026-II): se usan localmente para generar data/datos_base.js,
+# nunca se suben al repositorio.
+/*.xlsx
