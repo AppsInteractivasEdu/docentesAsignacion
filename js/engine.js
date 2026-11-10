@@ -435,7 +435,18 @@
       });
       if (!lista.length) {
         const pres = perfiles.find(p => p.programa === c.programa.replace(/\s*\(Distancia\)/i, '') && claveCurso(p.asignatura) === kc);
-        if (pres) { c.perfilSugerido = pres.id; c.perfilNota = 'No se suministró documento de perfiles para este programa. Existe un perfil para la misma asignatura en "' + pres.programa + '"; requiere validación para su homologación.'; return; }
+        if (pres) {
+          // Sin documento de perfiles propio para este programa (típicamente una modalidad
+          // "(Distancia)" de un programa que sí lo tiene): si la denominación es EXACTAMENTE
+          // la misma, se homologa sola — no hay nada que un humano deba decidir ahí. Si hay
+          // alguna variación de redacción, queda como sugerencia para homologación manual.
+          if (norm(c.asignatura) === norm(pres.asignatura)) {
+            c.perfilId = pres.id; usados.add(pres.id); c.perfilMatch = 'exacta';
+            c.perfilNota = 'Perfil homologado automáticamente: la asignatura tiene exactamente la misma denominación en "' + pres.programa + '", que no tiene documento de perfiles propio.';
+            return;
+          }
+          c.perfilSugerido = pres.id; c.perfilNota = 'No se suministró documento de perfiles para este programa. Existe un perfil para la misma asignatura en "' + pres.programa + '"; requiere validación para su homologación.'; return;
+        }
         c.perfilNota = 'No se suministró documento de perfiles docentes para este programa.';
         return;
       }
@@ -1166,15 +1177,27 @@
           f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'Pendiente de validación: el profesor no figura en la base de formación y experiencia cargada' });
           continue;
         }
-        const x = info.lista.find(y => y.id === o.id);
+        // Progresión de PPI (el docente que venía en el nivel anterior, p. ej. PPI I → PPI II, …,
+        // PPI VI/Práctica Profesional → PPI I): se propone SIEMPRE, sin exigir ningún requisito del
+        // perfil (pregrado, posgrado, experiencia, hoja de vida) — esa validación la hace el Director
+        // manualmente al revisar la propuesta, no el sistema de antemano. El único límite que sigue
+        // aplicando es el tope de horas (abajo): si no cabe, no se propone automáticamente y queda
+        // para que el Director lo asigne a mano con «Seleccionar por continuidad», avisado del exceso
+        // de carga. Por eso aquí se evalúa directamente (evaluar) en vez de tomarlo de info.lista, que
+        // ya excluye de entrada a quien no alcanza ningún nivel de cumplimiento (tier 0).
+        const esProgresionPPI = ppi && o.t === 'progresión';
+        let x = info.lista.find(y => y.id === o.id);
+        if (!x && esProgresionPPI) x = { id: o.id, ev: evaluar(perfilPorId.get(c.perfilId), prof, cfg) };
         if (!x) { f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'incumplimiento de ' + incumple(perfilPorId.get(c.perfilId), prof) }); continue; }
-        if (!preAfin(x)) {
-          const pg = tituloPre(o.id) || 'sin pregrado registrado';
-          if (posAfin(x)) { f.dir.push(x); f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'su pregrado (' + pg + ') no es afín con la asignatura; se evaluó su posgrado, que es afín, y queda para revisión manual del Director' }); }
-          else f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'su pregrado (' + pg + ') no es afín con la asignatura' });
-          continue;
+        if (!esProgresionPPI) {
+          if (!preAfin(x)) {
+            const pg = tituloPre(o.id) || 'sin pregrado registrado';
+            if (posAfin(x)) { f.dir.push(x); f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'su pregrado (' + pg + ') no es afín con la asignatura; se evaluó su posgrado, que es afín, y queda para revisión manual del Director' }); }
+            else f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'su pregrado (' + pg + ') no es afín con la asignatura' });
+            continue;
+          }
+          if (x.ev.tier < 3) { f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'Pendiente de validación: requisitos del perfil con afinidad por validar o información insuficiente' }); continue; }
         }
-        if (x.ev.tier < 3) { f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'Pendiente de validación: requisitos del perfil con afinidad por validar o información insuficiente' }); continue; }
         if (!cabe(x)) { f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'superaría el límite máximo de ' + horasMax + ' horas de carga académica total en la Universidad del Magdalena (' + (cargaTot(x.id) + h) + ' h proyectadas)' }); continue; }
         elegible = x; break;
       }

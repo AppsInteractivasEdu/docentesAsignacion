@@ -34,8 +34,8 @@ Primera hoja con una columna de identificación (`IDENTIFICACIÓN`, `CEDULA`, `N
 
 ## Reglas aplicadas (Fase 7)
 - Continuidad: se propone al profesor de 2026-II solo si acredita el perfil vigente (requisitos verificables acreditados) y le queda carga.
-- Progresión PPI: nivel n → n+1; PPI VI / Práctica Profesional → PPI I. Tiene prioridad sobre repetir el nivel, nunca sobre idoneidad o carga.
-- Pregrado primero (todos los componentes): solo se proponen y sugieren docentes con pregrado afín. Sin pregrado afín se evalúa el posgrado, pero no se asigna: queda «Pendiente de autorización del Director» y el Director decide manualmente.
+- Progresión PPI: nivel n → n+1; PPI VI / Práctica Profesional → PPI I. Tiene prioridad sobre repetir el nivel. El docente que venía en el nivel anterior **se propone siempre**, sin exigir ningún requisito del perfil (pregrado, posgrado, experiencia, hoja de vida) — esa validación la hace el Director manualmente al revisar la propuesta ya hecha. El único límite que sigue aplicando es el tope de horas: si no cabe, no se propone automáticamente; el Director puede igual asignarlo a mano con «Seleccionar por continuidad» (avisado del exceso de carga), y esa decisión queda registrada con motivo en la trazabilidad.
+- Pregrado primero (componentes Pedagógico y Didáctica de las Disciplinas, y PPI fuera de una cadena de progresión): solo se proponen y sugieren docentes con pregrado afín. Sin pregrado afín se evalúa el posgrado, pero no se asigna: queda «Pendiente de autorización del Director» y el Director decide manualmente.
 - Continuidad: el docente de 2026-II continúa solo si su pregrado es afín y cumple el resto del perfil; si no, se sugieren otros docentes.
 - Carga total máxima de 8 h = horas de esta propuesta + horas comprometidas en otras unidades.
 - Todas las asignaciones son propuestas sujetas a revisión y aprobación académica.

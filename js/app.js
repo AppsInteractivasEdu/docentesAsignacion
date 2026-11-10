@@ -692,6 +692,8 @@
     const ev = (perfil && prof) ? E.evaluar(perfil, prof, S.config) : null;
     const tipoLabel = bloqueoTipo === 'progresión' ? 'Progresión PPI desde 2026-II' : 'Continuidad desde 2026-II';
     const avisos = [];
+    const cargaAct = S.an.carga.get(bloqueoId) || 0, nueva = cargaAct + r.horas;
+    if (nueva > S.config.maxHoras) avisos.push('Con esta asignatura el docente tendría ' + nueva + ' h, superando el tope de ' + S.config.maxHoras + ' h. Solo debe asignarse con la decisión expresa del Director del Departamento; regístrela en el motivo.');
     if (!prof) avisos.push('El docente no figura en la base de formación y experiencia cargada: no es posible verificar su perfil, pero la asignación quedará aprobada por continuidad.');
     else if (ev && ev.tier === 0) avisos.push('El docente no acredita los requisitos obligatorios del perfil, pero la asignación quedará aprobada por continuidad.');
     else if (ev && ev.tier < 3) avisos.push('El docente tiene requisitos con afinidad por validar, pero la asignación quedará aprobada por continuidad.');
