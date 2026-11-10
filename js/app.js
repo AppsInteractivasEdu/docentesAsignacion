@@ -551,7 +551,7 @@
         '<div><b>Profesor(es) 2026-II de esta asignatura</b>' + esc((x.prev26 || []).join('; ') || '—') + '</div>' +
         '<div><b>Antecedente del docente propuesto</b>' + (x.origen ? esc(x.origen.asignatura + ' (' + x.origen.periodo + ')') : '—') + '</div>' +
         '<div><b>Carga total proyectada 2027-I</b>' + (x.cargaTotal != null ? x.cargaTotal + ' h (esta propuesta) ' + (x.cargaExt ? '· incluye ' + x.cargaExt + ' h de otras unidades' : '· sin carga externa registrada') : '—') + '</div>' +
-        '</div>' + ((x.bloqueos || []).length ? '<ul class="obs" style="margin-top:8px">' + x.bloqueos.map(b => '<li><b>' + esc(b.nombre) + '</b> (' + esc(b.t) + ' desde 2026-II) no continúa automáticamente: ' + esc(b.motivo) + '.' + (can('editar') && b.id ? ' <button class="btn sm" style="margin-left:6px" data-cont-id="' + esc(b.id) + '" data-cont-nom="' + esc(b.nombre) + '" data-cont-tipo="' + esc(b.t) + '">Seleccionar por continuidad</button>' : '') + '</li>').join('') + '</ul>' : '') + '</div></div>');
+        '</div>' + ((x.bloqueos || []).length ? '<ul class="obs" style="margin-top:8px">' + x.bloqueos.map(b => '<li><b>' + esc(b.nombre) + '</b> (' + esc(b.t) + ' desde 2026-II) no continúa automáticamente: ' + esc(b.motivo) + '.' + (can('editar') && b.id ? ' <button class="btn sm" style="margin-left:6px" data-cont-id="' + esc(b.id) + '" data-cont-nom="' + esc(b.nombre) + '" data-cont-tipo="' + esc(b.t) + '">' + (b.t === 'progresión' ? 'Seleccionar por progresión' : 'Seleccionar por continuidad') + '</button>' : '') + '</li>').join('') + '</ul>' : '') + '</div></div>');
     }
 
     // Docente asignado + acciones
@@ -690,22 +690,24 @@
     const prof = profPorId().get(bloqueoId);
     const perfil = c.perfilId ? perfilPorId().get(c.perfilId) : null;
     const ev = (perfil && prof) ? E.evaluar(perfil, prof, S.config) : null;
-    const tipoLabel = bloqueoTipo === 'progresión' ? 'Progresión PPI desde 2026-II' : 'Continuidad desde 2026-II';
+    const esProg = bloqueoTipo === 'progresión';
+    const tipoLabel = esProg ? 'Progresión PPI desde 2026-II' : 'Continuidad desde 2026-II';
+    const palabra = esProg ? 'progresión' : 'continuidad';
     const avisos = [];
     const cargaAct = S.an.carga.get(bloqueoId) || 0, nueva = cargaAct + r.horas;
     if (nueva > S.config.maxHoras) avisos.push('Con esta asignatura el docente tendría ' + nueva + ' h, superando el tope de ' + S.config.maxHoras + ' h. Solo debe asignarse con la decisión expresa del Director del Departamento; regístrela en el motivo.');
-    if (!prof) avisos.push('El docente no figura en la base de formación y experiencia cargada: no es posible verificar su perfil, pero la asignación quedará aprobada por continuidad.');
-    else if (ev && ev.tier === 0) avisos.push('El docente no acredita los requisitos obligatorios del perfil, pero la asignación quedará aprobada por continuidad.');
-    else if (ev && ev.tier < 3) avisos.push('El docente tiene requisitos con afinidad por validar, pero la asignación quedará aprobada por continuidad.');
-    else if (ev && ev.pre && ev.pre.s !== 'A' && !ev.pre.sinReq) avisos.push('El pregrado del docente no es afín con la asignatura según el perfil, pero la asignación quedará aprobada por continuidad.');
+    if (!prof) avisos.push('El docente no figura en la base de formación y experiencia cargada: no es posible verificar su perfil, pero la asignación quedará aprobada por ' + palabra + '.');
+    else if (ev && ev.tier === 0) avisos.push('El docente no acredita los requisitos obligatorios del perfil, pero la asignación quedará aprobada por ' + palabra + '.');
+    else if (ev && ev.tier < 3) avisos.push('El docente tiene requisitos con afinidad por validar, pero la asignación quedará aprobada por ' + palabra + '.');
+    else if (ev && ev.pre && ev.pre.s !== 'A' && !ev.pre.sinReq) avisos.push('El pregrado del docente no es afín con la asignatura según el perfil, pero la asignación quedará aprobada por ' + palabra + '.');
     const v = await modal({
-      titulo: 'Seleccionar por continuidad',
-      ok: 'Registrar y aprobar por continuidad',
+      titulo: esProg ? 'Seleccionar por progresión' : 'Seleccionar por continuidad',
+      ok: 'Registrar y aprobar por ' + palabra,
       html: '<div style="margin-bottom:8px"><b>' + esc(bloqueoNombre) + '</b> → ' + esc(c.asignatura) + ' (' + esc(corto(c.programa)) + ')</div>' +
         '<div class="notice info" style="margin:0 0 8px"><b>' + esc(tipoLabel) + '</b></div>' +
         (avisos.length ? '<div class="notice" style="margin:0 0 8px">' + avisos.map(esc).join('<br>') + '</div>' : '') +
-        '<div class="notice info" style="margin:0 0 8px">Esta selección queda <b>aprobada de inmediato</b> por tratarse de una decisión de continuidad. Puede revertirla en cualquier momento con «Revocar aprobación» o «Restablecer propuesta automática».</div>' +
-        '<label class="f">Motivo de la selección por continuidad (obligatorio)<textarea class="inp" name="motivo" required placeholder="Justificación académica de la continuidad…"></textarea></label>',
+        '<div class="notice info" style="margin:0 0 8px">Esta selección queda <b>aprobada de inmediato</b> por tratarse de una decisión de ' + palabra + '. Puede revertirla en cualquier momento con «Revocar aprobación» o «Restablecer propuesta automática».</div>' +
+        '<label class="f">Motivo de la selección por ' + palabra + ' (obligatorio)<textarea class="inp" name="motivo" required placeholder="Justificación académica de la ' + palabra + '…"></textarea></label>',
       validar: d => (!d.motivo || d.motivo.trim().length < 5) ? 'Indique el motivo (mínimo 5 caracteres).' : null,
     });
     if (!v) return;

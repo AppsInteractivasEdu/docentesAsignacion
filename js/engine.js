@@ -1140,11 +1140,13 @@
       const rows = histPorProg.get(progN(c.programa)) || [];
       const out = [];
       if (esPPIc(c)) {
+        // En PPI no existe "continuidad" (repetir el mismo nivel): el docente siempre avanza al
+        // siguiente nivel (I→II→…→VI/Práctica Profesional→I de nuevo). Por eso aquí solo se busca
+        // quien dictó el nivel ANTERIOR en 2026-II — nunca el mismo nivel de esta asignatura.
         const l = nivelPPI(c.asignatura);
         if (l) {
           const prev = l === 1 ? 6 : l - 1;
           rows.filter(h => h.nivel === prev).forEach(h => out.push({ id: h.id, t: 'progresión', h }));
-          rows.filter(h => h.nivel === l).forEach(h => out.push({ id: h.id, t: 'continuidad', h }));
         }
       } else rows.concat(filasFacultad).filter(h => mismaAsig(c, h)).forEach(h => out.push({ id: h.id, t: 'continuidad', h }));
       const vistos = new Set();
@@ -1205,7 +1207,12 @@
           if (x.ev.tier < 3) { f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'Pendiente de validación: requisitos del perfil con afinidad por validar o información insuficiente' }); continue; }
         }
         if (!cabe(x)) { f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'superaría el límite máximo de ' + horasMax + ' horas de carga académica total en la Universidad del Magdalena (' + (cargaTot(x.id) + h) + ' h proyectadas)' }); continue; }
-        elegible = x; break;
+        // El primero que cumple todo se propone automáticamente; los demás que TAMBIÉN cumplirían
+        // no desaparecen — se registran como alternativa disponible para que el Director los pueda
+        // asignar a mano (p. ej. cuando varios docentes del nivel anterior podrían progresar, pero
+        // esta asignatura solo tiene un cupo).
+        if (!elegible) elegible = x;
+        else f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'también cumple para ' + (o.t === 'progresión' ? 'progresar' : 'continuar') + ', pero este grupo ya quedó cubierto por otro docente; puede asignarlo manualmente si lo prefiere' });
       }
       if (pasada === 1 && !elegible && sinFicha) {
         r.docenteId = sinFicha.id; r.docenteNombre = sinFicha.nombre;
@@ -1276,10 +1283,10 @@
       if (prof && hist.length) {
         const mine = rowsBusqueda.filter(x => x.id === prof.id);
         if (esPPIc(c)) {
+          // Sin "continuidad" para PPI (ver nota en preferidos()): solo progresión desde el nivel anterior.
           const l = nivelPPI(c.asignatura), prev = l === 1 ? 6 : l - 1;
-          const hp = l && mine.find(x => x.nivel === prev), hc = l && mine.find(x => x.nivel === l);
+          const hp = l && mine.find(x => x.nivel === prev);
           if (hp) { f.tipo = 'progresión'; f.origen = hp; f.nivelOrigen = prev; f.nivelDestino = l; }
-          else if (hc) { f.tipo = 'continuidad'; f.origen = hc; }
         } else { const hc = mine.find(x => mismaAsig(c, x)); if (hc) { f.tipo = 'continuidad'; f.origen = hc; } }
       } else if (!prof && r.esContinuidad && f.tipoSinFicha) {
         // Caso especial de continuidad sin ficha en la base: el tipo y el antecedente ya se fijaron
