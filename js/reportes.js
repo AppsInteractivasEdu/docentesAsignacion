@@ -42,6 +42,9 @@
     { h: 'Tipo de asignación', k: 'tipoAsignacion', w: 16 },
     { h: 'Carga total proyectada 2027-I (h)', k: 'cargaTotal', w: 14 },
     { h: 'Docentes para revisión del Director', k: 'revisionDirector', w: 44 },
+    // Solo aparecen en lo que se exporta desde la Asignación 2027-I (un archivo por grupo ofertado).
+    { h: 'Grupo', k: 'grupoTxt', w: 14, opc: true },
+    { h: 'Acuerdo académico', k: 'acuerdo', w: 34, opc: true },
   ];
 
   function fmtFecha(d) {
@@ -52,6 +55,7 @@
 
   function hoja(wb, nombre, titulo, subtitulo, cols, filas, opts) {
     opts = opts || {};
+    cols = cols.filter(c => !c.opc || filas.some(f => f[c.k] !== undefined && f[c.k] !== ''));
     const ws = wb.addWorksheet(nombre.slice(0, 31), { views: [{ state: 'frozen', ySplit: 4, xSplit: opts.xSplit || 0 }], properties: { defaultRowHeight: 15 } });
     ws.columns = cols.map(c => ({ key: c.k, width: c.w }));
     ws.mergeCells(1, 1, 1, Math.min(cols.length, 8));

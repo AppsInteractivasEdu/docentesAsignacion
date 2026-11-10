@@ -1039,7 +1039,10 @@
     ds.cursos.forEach(c => {
       if (!c._orig) Object.defineProperty(c, '_orig', { value: { perfilId: c.perfilId, perfilMatch: c.perfilMatch, perfilNota: c.perfilNota }, enumerable: false });
       Object.assign(c, c._orig);
-      const o = overrides[c.id];
+      let o = overrides[c.id];
+      // Un grupo ofertado 2027-I hereda la homologación de perfil que ya se hubiera hecho sobre la
+      // asignatura del plan de la que proviene.
+      if (!(o && o.perfilId) && c.baseId && overrides[c.baseId] && overrides[c.baseId].perfilId) o = overrides[c.baseId];
       if (o && o.perfilId && perfilPorId.has(o.perfilId)) {
         c.perfilId = o.perfilId; c.perfilMatch = 'homologado';
         c.perfilNota = 'Perfil homologado por decisión académica: "' + perfilPorId.get(o.perfilId).titulo + '" (' + perfilPorId.get(o.perfilId).programa + ')' + (o.perfilMotivo ? '. Motivo: ' + o.perfilMotivo : '') + '.';
@@ -1072,6 +1075,11 @@
     const asignados = new Map(); // docenteId -> [cursoId]
     const horasDe = c => c.horas != null && c.horas !== '' ? Number(c.horas) : Math.round((c.creditos || 0) * cfg.horasPorCredito * 10) / 10;
     const add = (d, c) => { carga.set(d, (carga.get(d) || 0) + horasDe(c)); if (!asignados.has(d)) asignados.set(d, []); asignados.get(d).push(c.id); };
+    // Grupos de una misma asignatura ofertada (Asignación 2027-I): comparten `ofertaId`. Se prefiere
+    // proponer docentes distintos en cada grupo; el mismo docente solo se repite si no hay otro
+    // candidato y le caben las horas.
+    const cursoPorIdA = new Map(ds.cursos.map(c => [c.id, c]));
+    const hermanoYaTiene = (c, did) => !!c.ofertaId && (asignados.get(did) || []).some(cid => cid !== c.id && (cursoPorIdA.get(cid) || {}).ofertaId === c.ofertaId);
 
     const res = new Map();
     ds.cursos.forEach(c => {
@@ -1173,6 +1181,8 @@
       const cabe = x => cargaTot(x.id) + h <= cfg.maxHoras;
       let elegible = null;
       let sinFicha = null; // mejor candidato de continuidad/progresión sin ficha en la base, como respaldo
+      let sinFichaRepetido = null; // ídem, pero ya propuesto en otro grupo de esta misma asignatura
+      const repetidos = []; // candidatos válidos que ya están propuestos en otro grupo de esta asignatura
       if (pasada === 1) for (const o of preferidos(c)) {
         const prof = profPorId.get(o.id);
         const nom = prof ? prof.nombre : o.h.nombre;
@@ -1181,7 +1191,10 @@
           // perfil, así que no se le puede exigir su cumplimiento. Se guarda como respaldo — solo se usa
           // si ningún otro candidato verificable queda disponible para esta asignatura — y de todas
           // formas respeta el tope de horas institucional.
-          if (!sinFicha && cargaTot(o.id) + h <= cfg.maxHoras) sinFicha = { id: o.id, nombre: nom, t: o.t, h: o.h };
+          if (cargaTot(o.id) + h <= cfg.maxHoras) {
+            if (!hermanoYaTiene(c, o.id)) { if (!sinFicha) sinFicha = { id: o.id, nombre: nom, t: o.t, h: o.h }; }
+            else if (!sinFichaRepetido) sinFichaRepetido = { id: o.id, nombre: nom, t: o.t, h: o.h };
+          }
           f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'Pendiente de validación: el profesor no figura en la base de formación y experiencia cargada' });
           continue;
         }
@@ -1211,19 +1224,27 @@
         // no desaparecen — se registran como alternativa disponible para que el Director los pueda
         // asignar a mano (p. ej. cuando varios docentes del nivel anterior podrían progresar, pero
         // esta asignatura solo tiene un cupo).
+        if (hermanoYaTiene(c, x.id)) { repetidos.push({ x, o, nom }); continue; }
         if (!elegible) elegible = x;
         else f.bloqueos.push({ id: o.id, nombre: nom, t: o.t, motivo: 'también cumple para ' + (o.t === 'progresión' ? 'progresar' : 'continuar') + ', pero este grupo ya quedó cubierto por otro docente; puede asignarlo manualmente si lo prefiere' });
       }
-      if (pasada === 1 && !elegible && sinFicha) {
-        r.docenteId = sinFicha.id; r.docenteNombre = sinFicha.nombre;
+      // Docentes ya propuestos en otro grupo de esta misma asignatura: solo se repiten si no hay otro candidato.
+      if (pasada === 1 && repetidos.length) {
+        const [primero, ...resto] = repetidos;
+        if (!elegible) { elegible = primero.x; resto.forEach(q => f.bloqueos.push({ id: q.o.id, nombre: q.nom, t: q.o.t, motivo: 'ya está propuesto en otro grupo de esta misma asignatura; puede asignarlo también aquí si lo prefiere' })); }
+        else repetidos.forEach(q => f.bloqueos.push({ id: q.o.id, nombre: q.nom, t: q.o.t, motivo: 'ya está propuesto en otro grupo de esta misma asignatura; puede asignarlo también aquí si lo prefiere' }));
+      }
+      if (pasada === 1 && !elegible && (sinFicha || sinFichaRepetido)) {
+        const sf = sinFicha || sinFichaRepetido;
+        r.docenteId = sf.id; r.docenteNombre = sf.nombre;
         r.esContinuidad = true; r.sinFicha = true;
-        f.tipoSinFicha = sinFicha.t; f.origenSinFicha = sinFicha.h;
-        add(sinFicha.id, c);
-        f.bloqueos = f.bloqueos.filter(b => b.id !== sinFicha.id);
+        f.tipoSinFicha = sf.t; f.origenSinFicha = sf.h;
+        add(sf.id, c);
+        f.bloqueos = f.bloqueos.filter(b => b.id !== sf.id);
       }
       if (pasada === 2 && !elegible) {
         const cand = info.lista.filter(x => x.ev.tier >= 1 && cabe(x));
-        elegible = cand.find(preAfin) || null;
+        elegible = cand.find(x => preAfin(x) && !hermanoYaTiene(c, x.id)) || cand.find(preAfin) || null;
         if (!elegible) {
           const ya = new Set(f.dir.map(x => x.id));
           cand.filter(x => !preAfin(x) && x.ev.pre.s !== 'I' && posAfin(x) && !ya.has(x.id)).forEach(x => f.dir.push(x));
@@ -1422,6 +1443,10 @@
         revisionDirector: (r.revisionDirector || []).map((a, i) => (i + 1) + '. ' + a.nombre + (a.pregrado ? ' (pregrado: ' + a.pregrado + ')' : '')).join('\n'),
         f7: r.f7 || null,
         esContinuidad: r.esContinuidad || false,
+        grupo: c.grupo || '',
+        gruposTotal: c.gruposTotal || '',
+        grupoTxt: c.grupo ? 'Grupo ' + c.grupo + ' de ' + c.gruposTotal : '',
+        acuerdo: c.acuerdo || '',
       };
     });
   }
@@ -1542,6 +1567,62 @@
     };
   }
 
+  /**
+   * Asignación 2027-I: arma un conjunto de datos con UN curso por cada grupo que los directores de
+   * programa decidieron ofertar (ofertas = documentos de la colección `ofertas2027I` de Firestore:
+   * {id, nombrePrograma, plan, acuerdo, asignatura, creditos, componente, orden, grupos}). Las
+   * asignaturas SIN OFERTAR (grupos = 0) y las aún sin definir (grupos = null) no generan cursos.
+   * Cada curso toma del plan de estudios (ds) todo lo que ya se sabe de la asignatura —componente,
+   * semestre, créditos, perfil— y agrega: ofertaId (común a los grupos de una misma asignatura),
+   * grupo, gruposTotal, acuerdo y baseId (curso del plan del que proviene).
+   */
+  function construirOferta(ds, ofertas) {
+    const cmp = (a, b) => String(a.nombrePrograma).localeCompare(String(b.nombrePrograma), 'es') ||
+      (a.plan === b.plan ? 0 : a.plan === 'Plan de transición' ? -1 : 1) || (a.orden || 0) - (b.orden || 0);
+    const filas = (ofertas || []).filter(o => Number(o.grupos) >= 1).sort(cmp);
+    const porProgPlan = new Map();
+    ds.cursos.forEach(c => { const k = c.programa + '|' + c.plan; if (!porProgPlan.has(k)) porProgPlan.set(k, []); porProgPlan.get(k).push(c); });
+    const cursos = [], sinCruce = [], nuevos = [];
+    filas.forEach(o => {
+      const lista = porProgPlan.get(o.nombrePrograma + '|' + o.plan) || [];
+      const k = claveCompleta(o.asignatura);
+      let base = lista.find(c => claveCompleta(c.asignatura) === k) || null;
+      if (!base) {
+        const t = tokens(o.asignatura);
+        const mejor = lista.map(c => { const tc = tokens(c.asignatura); return { c, s: overlap(t, tc) / Math.max(t.length, tc.length || 1) }; }).sort((a, b) => b.s - a.s)[0];
+        if (mejor && mejor.s >= 0.8) base = mejor.c;
+      }
+      const n = Math.min(10, Math.floor(Number(o.grupos)));
+      for (let g = 1; g <= n; g++) {
+        let c;
+        if (base) {
+          c = Object.assign({}, base);
+          if (base._orig) Object.assign(c, base._orig); // vínculo de perfil original, sin homologaciones manuales
+        } else {
+          // Asignatura del formato que no está en los planes cargados: se arma con lo que trae el formato.
+          let cl = clasificar(o.asignatura, o.componente);
+          if (!cl && /^didactic/.test(norm(o.asignatura))) {
+            cl = { componente: COMP.DID, revision: 'El formato de necesidades la clasifica como «' + o.componente + '»; se trató como Didáctica de las Disciplinas. Revisar.' };
+          }
+          if (!cl) { if (g === 1) sinCruce.push(o); break; }
+          c = {
+            id: '', plan: o.plan, programa: o.nombrePrograma, componente: cl.componente, componenteOficial: o.componente,
+            revisionClasificacion: cl.revision, codigo: '', asignatura: o.asignatura, creditos: Number(o.creditos) || 0,
+            semestre: '', prerrequisitos: '', archivoPlan: 'Formato de necesidades 2027-I',
+            perfilId: null, perfilMatch: null, perfilNota: '', perfilSugerido: null,
+          };
+          nuevos.push(c);
+        }
+        c.id = hash('oferta27|' + o.id + '|' + g);
+        c.baseId = base ? base.id : null;
+        c.ofertaId = o.id; c.grupo = g; c.gruposTotal = n; c.acuerdo = o.acuerdo || '';
+        cursos.push(c);
+      }
+    });
+    if (nuevos.length) vincularPerfiles(nuevos, ds.perfiles);
+    return { ds: { cursos, perfiles: ds.perfiles, profesores: ds.profesores }, sinCruce };
+  }
+
   /** Identifica archivos faltantes, duplicados o inconsistentes. */
   function diagnosticoArchivos(fuentes, meta) {
     const out = [];
@@ -1572,7 +1653,7 @@
   }
 
   return {
-    VERSION, COMP, construirDataset, diagnosticoArchivos, matchPrograma, COMP_ORDEN, EST, ESTADOS, R, DEFAULT_CONFIG,
+    VERSION, COMP, construirDataset, construirOferta, diagnosticoArchivos, matchPrograma, COMP_ORDEN, EST, ESTADOS, R, DEFAULT_CONFIG,
     norm, tokens, hash, abreviarPrograma, canonPrograma, nivelPPI, ROMANO, progN, cedula,
     procesarPlan, inventario, clasificar, docxParagraphs, pdfParagraphs, parsePerfiles, vincularPerfiles, requisitos,
     procesarFormacion, procesarExperiencia, consolidarProfesores, evaluar, analizar, prepararHistorico, procesarCargaInstitucional,

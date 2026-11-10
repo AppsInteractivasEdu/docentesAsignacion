@@ -136,7 +136,12 @@
     user: null, users: [], fuentes: null, archivos: [], fuentesMod: false, ds: null, meta: null, an: null, cache: {},
     overrides: {}, config: Object.assign({}, E.DEFAULT_CONFIG), log: [], snapshots: [], filas: [], filaPorId: new Map(),
     f: { prog: '', comp: '', plan: '', est: '', q: '' }, docPage: 0, logPage: 0, abierto: null,
+    // Dos conjuntos de datos: G = planes de estudio (todas las asignaturas) y O = Asignación 2027-I
+    // (un curso por cada grupo que los directores de programa decidieron ofertar). S.ds/S.an/S.filas…
+    // apuntan siempre al conjunto activo (ver aplicarVista).
+    G: null, O: null, ofertas: [], ofertaEstado: null, vista27: false, tab: 'asignacion',
   };
+  try { S.vista27 = sessionStorage.getItem('ad_vista27') === '1'; } catch (e) { /* sin sessionStorage */ }
   const can = p => S.user && (PERMISOS[S.user.rol] || []).includes(p);
   const profPorId = () => S._pp || (S._pp = new Map(S.ds.profesores.map(p => [p.id, p])));
   const perfilPorId = () => S._pf || (S._pf = new Map(S.ds.perfiles.map(p => [p.id, p])));
@@ -336,40 +341,103 @@
       loading(false);
     } else renderTodo();
     poblarFiltros();
+    iniciarOferta();
+  }
+
+  /* ================================================================== */
+  /* Oferta 2027-I en tiempo real (definida por los directores de programa) */
+  /* ================================================================== */
+  let ofertaT;
+  function iniciarOferta() {
+    if (S._ofertaIniciada || !window.Oferta) return;
+    S._ofertaIniciada = true;
+    // Copia local de la última oferta recibida: permite abrir la aplicación sin conexión.
+    Store.get('oferta27').then(c => {
+      if (c && c.filas && c.filas.length && !S.ofertaLista) { S.ofertas = c.filas; S.ofertaLista = true; programarOferta(); }
+    }).catch(() => { /* sin copia local */ });
+    window.Oferta.iniciar(filas => {
+      const antes = new Map(S.ofertas.map(o => [o.id, o.grupos]));
+      const cambiadas = S.ofertaLista ? filas.filter(o => antes.get(o.id) !== o.grupos) : [];
+      S.ofertas = filas; S.ofertaLista = true;
+      Store.set('oferta27', { filas, fecha: Date.now() }).catch(() => { /* sin almacenamiento */ });
+      programarOferta(cambiadas);
+    }, est => { S.ofertaEstado = est; if (S.ds) pintarVista(); });
+  }
+  /** Reconstruye la Asignación 2027-I cuando cambia la oferta (agrupa ráfagas de cambios en un solo recálculo). */
+  function programarOferta(cambiadas) {
+    clearTimeout(ofertaT);
+    ofertaT = setTimeout(() => {
+      if (!S.G) return;
+      S.O = armarOferta();
+      aplicarVista();
+      if (cambiadas && cambiadas.length && enOferta()) {
+        const porProg = {};
+        cambiadas.forEach(o => { porProg[corto(o.nombrePrograma)] = (porProg[corto(o.nombrePrograma)] || 0) + 1; });
+        toast('Oferta 2027-I actualizada: ' + Object.entries(porProg).map(([p, n]) => p + ' (' + n + (n === 1 ? ' asignatura' : ' asignaturas') + ')').join(', ') + '.');
+      }
+    }, 350);
   }
 
   async function reconstruir() {
     const r = E.construirDataset(S.fuentes);
-    S.ds = r.ds; S.meta = r.meta; S.cache = {}; S._pp = S._pf = S._cp = null;
+    S.G = { ds: r.ds, meta: r.meta };
+    S.cache = {}; S._pp = S._pf = S._cp = null;
+    S.O = S.ofertaLista ? armarOferta() : null;
     recalcular();
+  }
+  /** Conjunto de datos de la Asignación 2027-I a partir de la oferta que definieron los directores. */
+  function armarOferta() {
+    const r = E.construirOferta(S.G.ds, S.ofertas);
+    return { ds: r.ds, meta: S.G.meta, sinCruce: r.sinCruce };
   }
   function fase7Ctx() {
     const h = S.fuentes && S.fuentes.historico7, c = S.fuentes && S.fuentes.cargaInst7;
-    const cargaExt = c && c.rows ? E.procesarCargaInstitucional(c.rows, S.ds.profesores) : new Map();
+    const cargaExt = c && c.rows ? E.procesarCargaInstitucional(c.rows, (S.G || S).ds.profesores) : new Map();
     return {
       hist: h && h.rows ? E.prepararHistorico(h.rows) : [],
       cargaExt, cargaInstCargada: cargaExt.size > 0,
       autorizaciones: (S.excepciones7 || []).filter(e => e.decision === 'autorizada' && e.docenteId).map(e => ({ docenteId: e.docenteId, progN: E.progN(e.programa), nivel: e.nivelNum })),
     };
   }
-  function recalcular() {
-    S.an = E.analizar(S.ds, S.config, S.overrides, null, S.cache, fase7Ctx());
+  /** ¿La pantalla muestra la Asignación 2027-I? Solo en la pestaña «Asignación docente»; el resto de la aplicación trabaja con los planes de estudio. */
+  const enOferta = () => !!(S.vista27 && S.O && S.tab === 'asignacion');
+  function calcularConjunto(b) {
+    b.an = E.analizar(b.ds, S.config, S.overrides, null, S.cache, fase7Ctx());
+    b.filas = E.filasReporte(b.ds, b.an);
+    b.filaPorId = new Map(b.filas.map(f => [f.id, f]));
+    b.stats = E.estadisticas(b.ds, b.an);
+    b.qa = E.controlCalidad(b.ds, b.an, b.meta);
+  }
+  /** Apunta S.ds/S.an/S.filas… al conjunto que corresponde a la vista actual (calculándolo si hace falta) y vuelve a pintar. */
+  function aplicarVista(sinPintar) {
+    const b = enOferta() ? S.O : S.G;
+    if (!b.an) calcularConjunto(b);
+    S.ds = b.ds; S.meta = b.meta; S.an = b.an; S.filas = b.filas; S.filaPorId = b.filaPorId; S.stats = b.stats; S.qa = b.qa;
+    S._pp = S._pf = S._cp = null;
     S._da = null; // se recalcula con cada análisis: ver docentesAntecedentes()
-    S.filas = E.filasReporte(S.ds, S.an);
-    S.filaPorId = new Map(S.filas.map(f => [f.id, f]));
-    S.stats = E.estadisticas(S.ds, S.an);
-    S.qa = E.controlCalidad(S.ds, S.an, S.meta);
+    if (S.abierto && !cursoPorId().has(S.abierto)) cerrarDrawer();
+    if (sinPintar) return;
+    poblarFiltros();
     renderTodo();
     if (window.Fase7 && window.Fase7.sincronizar) window.Fase7.sincronizar();
+  }
+  function recalcular() {
+    if (S.G) S.G.an = null;
+    if (S.O) S.O.an = null;
+    aplicarVista();
   }
 
   /* ================================================================== */
   /* Navegación                                                          */
   /* ================================================================== */
   function irA(v) {
+    const antes = enOferta();
+    S.tab = v;
     $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
     $$('.view').forEach(x => x.classList.toggle('active', x.id === 'v-' + v));
     window.scrollTo({ top: 0 });
+    // La Asignación 2027-I solo se muestra en «Asignación docente»: al salir o volver se cambia de conjunto de datos.
+    if (S.G && antes !== enOferta()) aplicarVista();
   }
   $$('.tab').forEach(t => t.onclick = () => irA(t.dataset.view));
 
@@ -411,9 +479,10 @@
       if (dif.length) throw new Error('Inconsistencia entre la vista y la exportación (' + dif.length + ' filas). Recargue la aplicación.');
       let wb, nombre;
       const fecha = new Date().toISOString().slice(0, 10);
-      if (tipo === 'programa') { wb = window.Reportes.libroPrograma(ExcelJS, ctx, S.f.prog); nombre = 'Asignacion_' + window.Reportes.nombreArchivo(S.f.prog) + '_' + fecha + '.xlsx'; }
-      else if (tipo === 'consolidado') { wb = window.Reportes.libroConsolidado(ExcelJS, ctx); nombre = 'Consolidado_Asignacion_Docente_' + fecha + '.xlsx'; }
-      else if (tipo === 'pendientes') { wb = window.Reportes.libroPendientes(ExcelJS, ctx); nombre = 'Asignaturas_sin_docente_' + fecha + '.xlsx'; }
+      const pre = enOferta() ? 'Oferta_2027-I_' : ''; // lo exportado desde la Asignación 2027-I trae un archivo por grupo ofertado
+      if (tipo === 'programa') { wb = window.Reportes.libroPrograma(ExcelJS, ctx, S.f.prog); nombre = pre + 'Asignacion_' + window.Reportes.nombreArchivo(S.f.prog) + '_' + fecha + '.xlsx'; }
+      else if (tipo === 'consolidado') { wb = window.Reportes.libroConsolidado(ExcelJS, ctx); nombre = pre + 'Consolidado_Asignacion_Docente_' + fecha + '.xlsx'; }
+      else if (tipo === 'pendientes') { wb = window.Reportes.libroPendientes(ExcelJS, ctx); nombre = pre + 'Asignaturas_sin_docente_' + fecha + '.xlsx'; }
       else if (tipo === 'comparativo' || tipo === 'comparativoPrograma') { const pg = tipo === 'comparativoPrograma' ? S.f.prog : null; wb = window.Reportes.libroComparativo(ExcelJS, ctx, pg); nombre = 'Comparativo_2026II_2027I_' + (pg ? window.Reportes.nombreArchivo(pg) + '_' : '') + fecha + '.xlsx'; }
       else if (tipo === 'autorizaciones') { wb = window.Reportes.libroAutorizaciones(ExcelJS, ctx); nombre = 'Autorizaciones_PPI_' + fecha + '.xlsx'; }
       else if (tipo === 'inventario') { wb = window.Reportes.libroInventario(ExcelJS, ctx); nombre = 'Inventario_asignaturas_' + fecha + '.xlsx'; }
@@ -462,6 +531,7 @@
   /* ================================================================== */
   function poblarFiltros() {
     const progs = [...new Set(S.ds.cursos.map(c => c.programa))].sort((a, b) => a.localeCompare(b, 'es'));
+    if (S.f.prog && !progs.includes(S.f.prog)) S.f.prog = '';
     $('#f-prog').innerHTML = '<option value="">Todos los programas</option>' + progs.map(p => '<option' + (p === S.f.prog ? ' selected' : '') + '>' + esc(p) + '</option>').join('');
     $('#f-est').innerHTML = '<option value="">Todos los estados</option>' + E.ESTADOS.map(e => '<option' + (e === S.f.est ? ' selected' : '') + '>' + esc(e) + '</option>').join('');
   }
@@ -478,20 +548,107 @@
   $('#f-q').addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => { S.f.q = $('#f-q').value; renderAsignacion(); }, 150); });
 
   function filasFiltradas() {
-    const q = E.norm(S.f.q);
-    return S.filas.filter(f => (!S.f.prog || f.programa === S.f.prog) && (!S.f.comp || f.componente === S.f.comp) && (!S.f.plan || f.plan === S.f.plan) &&
-      (!S.f.est || f.estado === S.f.est) && (!S.f.tipo || (f.f7 && f.f7.tipo === S.f.tipo)) && (!q || E.norm(f.asignatura + ' ' + f.programa + ' ' + f.docente + ' ' + f.alternativas).includes(q)))
+    // En la Asignación 2027-I solo se usan los filtros de programa y componente.
+    const of = enOferta();
+    const q = of ? '' : E.norm(S.f.q);
+    return S.filas.filter(f => (!S.f.prog || f.programa === S.f.prog) && (!S.f.comp || f.componente === S.f.comp) && (of || ((!S.f.plan || f.plan === S.f.plan) &&
+      (!S.f.est || f.estado === S.f.est) && (!S.f.tipo || (f.f7 && f.f7.tipo === S.f.tipo)))) && (!q || E.norm(f.asignatura + ' ' + f.programa + ' ' + f.docente + ' ' + f.alternativas).includes(q)))
       .sort((a, b) => a.programa.localeCompare(b.programa, 'es') || E.COMP_ORDEN.indexOf(a.componente) - E.COMP_ORDEN.indexOf(b.componente) ||
-        (a.plan === b.plan ? 0 : a.plan === 'Plan de transición' ? -1 : 1) || (Number(a.semestre) || 99) - (Number(b.semestre) || 99) || a.asignatura.localeCompare(b.asignatura, 'es'));
+        (a.plan === b.plan ? 0 : a.plan === 'Plan de transición' ? -1 : 1) || (Number(a.semestre) || 99) - (Number(b.semestre) || 99) || a.asignatura.localeCompare(b.asignatura, 'es') ||
+        (a.grupo || 0) - (b.grupo || 0));
   }
+
+  /* ---- Asignación 2027-I: selector de vista, estado de la conexión y resumen de la oferta ---- */
+  const hora = ms => ms ? new Date(ms).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+  function resumenOferta() {
+    const por = new Map();
+    S.ofertas.forEach(o => {
+      if (!por.has(o.nombrePrograma)) por.set(o.nombrePrograma, { programa: o.nombrePrograma, total: 0, definidas: 0, ofertadas: 0, sinOfertar: 0, pendientes: 0, grupos: 0, ultima: 0 });
+      const p = por.get(o.nombrePrograma);
+      p.total++;
+      if (o.grupos == null) p.pendientes++; else if (o.grupos === 0) { p.definidas++; p.sinOfertar++; } else { p.definidas++; p.ofertadas++; p.grupos += o.grupos; }
+      if (o.actualizadoEn && o.actualizadoEn > p.ultima) p.ultima = o.actualizadoEn;
+    });
+    const filas = [...por.values()].sort((a, b) => a.programa.localeCompare(b.programa, 'es'));
+    const tot = filas.reduce((t, p) => { Object.keys(p).forEach(k => { if (typeof p[k] === 'number' && k !== 'ultima') t[k] = (t[k] || 0) + p[k]; }); return t; }, {});
+    return { filas, tot };
+  }
+  function pintarVista() {
+    const of = enOferta(), quiere = S.vista27;
+    $$('#vista-bar [data-vista]').forEach(b => { const on = (b.dataset.vista === 'oferta') === quiere; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    const { filas, tot } = resumenOferta();
+    $('#seg-n').textContent = tot.grupos ? tot.grupos + ' grupos' : '';
+    ['#f-plan', '#f-est', '#f-tipo7', '#f-q'].forEach(id => {
+      const el = $(id); el.disabled = of;
+      el.closest('.f').classList.toggle('desactivado', of);
+      el.title = of ? 'En la Asignación 2027-I solo se usan los filtros de programa y componente.' : '';
+    });
+    const st = S.ofertaEstado, ult = S.ofertas.length ? ' · se muestra la última oferta guardada en este equipo' : '';
+    const btn = (attr, txt) => ' <button type="button" class="btn sm" ' + attr + '>' + txt + '</button>';
+    $('#oferta-estado').innerHTML = !st || st.modo === 'conectando' ? '<span class="chip st-sinp">Conectando con la oferta…</span>'
+      : st.ok ? '<span class="chip st-aprob">● Sincronizada en tiempo real · ' + hora(st.ultima) + '</span> <span class="small muted">' + esc(st.usuario || '') + '</span>' + btn('data-of-logout', 'Cerrar sesión')
+        : st.modo === 'requiere-sesion' ? '<span class="chip st-valid">Inicie sesión para ver la oferta 2027-I' + ult + '</span>' + btn('data-of-login', '🔑 Iniciar sesión')
+          : st.modo === 'sin-permiso' ? '<span class="chip st-pend" title="' + esc(st.error || '') + '">Esta cuenta no puede ver toda la oferta' + ult + '</span>' + btn('data-of-cambiar', 'Usar otra cuenta')
+            : '<span class="chip st-pend" title="' + esc(st.error || '') + '">Sin conexión con la oferta' + (S.ofertas.length ? ' · se muestra la última recibida' : '') + '</span>';
+    const bn = $('#oferta-banner');
+    bn.classList.toggle('hidden', !quiere);
+    if (!quiere) return;
+    const pend = tot.pendientes || 0, fmtP = p => esc(corto(p));
+    bn.innerHTML = '<div class="oferta-banner-h"><div><b>Asignación 2027-I</b> · oferta definida por los directores de programa</div>' +
+      '<div class="small"><b>' + (tot.grupos || 0) + '</b> grupos en <b>' + (tot.ofertadas || 0) + '</b> asignaturas ofertadas · <b>' + (tot.sinOfertar || 0) + '</b> sin ofertar (no aparecen aquí) · <b>' + pend + '</b> por definir</div></div>' +
+      (!S.ofertas.length ? '<div class="notice" style="margin:8px 0 0">Todavía no hay asignaturas con oferta. Los directores de programa la definen en el aplicativo de Perfiles Docentes, en su panel «Oferta 2027-I».</div>' :
+        '<details class="oferta-det"><summary>Avance por programa</summary><div class="table-wrap"><table class="t"><thead><tr><th>Programa</th><th class="num">Asignaturas</th><th class="num">Con oferta</th><th class="num">Grupos</th><th class="num">Sin ofertar</th><th class="num">Por definir</th><th>Última actualización</th></tr></thead><tbody>' +
+        filas.map(p => '<tr><td>' + fmtP(p.programa) + '</td><td class="num">' + p.total + '</td><td class="num">' + p.ofertadas + '</td><td class="num"><b>' + p.grupos + '</b></td><td class="num">' + p.sinOfertar + '</td><td class="num">' + (p.pendientes ? '<span class="tag warn">' + p.pendientes + '</span>' : '0') + '</td><td class="small">' + (p.ultima ? new Date(p.ultima).toLocaleString('es-CO') : '—') + '</td></tr>').join('') +
+        '</tbody></table></div></details>') +
+      (S.O && S.O.sinCruce && S.O.sinCruce.length ? '<div class="notice" style="margin:8px 0 0">No se pudieron clasificar ' + S.O.sinCruce.length + ' asignaturas ofertadas: ' + S.O.sinCruce.map(o => esc(o.asignatura)).join('; ') + '.</div>' : '');
+  }
+  /** Inicio de sesión (Director de Departamento del aplicativo de Perfiles Docentes) para leer la oferta, que no es pública. */
+  async function iniciarSesionOferta() {
+    const v = await modal({
+      titulo: 'Conectar con la oferta 2027-I', ok: 'Iniciar sesión',
+      html: '<div class="notice info" style="margin:0 0 8px">La oferta que definen los directores de programa es privada. Use la cuenta del <b>Director de Departamento</b> del aplicativo de Perfiles Docentes. Solo hace falta una vez por equipo; la contraseña no se guarda en esta aplicación.</div>' +
+        '<label class="f">Correo<input class="inp" name="correo" type="email" autocomplete="username" placeholder="usuario@unimagdalena.app"></label>' +
+        '<label class="f">Contraseña<input class="inp" name="clave" type="password" autocomplete="current-password"></label>',
+      validar: d => (!d.correo || !d.clave) ? 'Escriba el correo y la contraseña.' : null,
+    });
+    if (!v) return;
+    loading(true, 'Iniciando sesión…');
+    try { await window.Oferta.iniciarSesion(v.correo, v.clave); toast('Sesión iniciada. Cargando la oferta 2027-I…'); }
+    catch (e) { toast(window.Oferta.mensajeError(e), true); }
+    loading(false);
+  }
+  $('#oferta-estado').addEventListener('click', async e => {
+    if (e.target.closest('[data-of-login]')) iniciarSesionOferta();
+    else if (e.target.closest('[data-of-logout]')) await window.Oferta.cerrarSesion();
+    else if (e.target.closest('[data-of-cambiar]')) { await window.Oferta.cerrarSesion(); iniciarSesionOferta(); }
+  });
+  $$('#vista-bar [data-vista]').forEach(b => b.onclick = () => {
+    const quiere = b.dataset.vista === 'oferta';
+    if (quiere === S.vista27) return;
+    S.vista27 = quiere;
+    try { sessionStorage.setItem('ad_vista27', quiere ? '1' : '0'); } catch (e) { /* sin sessionStorage */ }
+    aplicarVista();
+  });
+
   function renderAsignacion() {
+    pintarVista();
+    if (S.vista27 && !S.O && S.tab === 'asignacion') {
+      const m = S.ofertaEstado && S.ofertaEstado.modo;
+      const msg = m === 'requiere-sesion' ? 'Inicie sesión (botón «Iniciar sesión», arriba) con la cuenta del Director de Departamento para ver la oferta 2027-I.'
+        : m === 'sin-permiso' ? 'La cuenta con la que inició sesión no puede ver toda la oferta. Use la del Director de Departamento.'
+          : S.ofertaEstado && !S.ofertaEstado.ok && m !== 'conectando' ? 'No fue posible conectar con la oferta 2027-I. Revise la conexión a internet.' : 'Cargando la oferta 2027-I definida por los directores de programa…';
+      $('#asig-count').textContent = '';
+      $('#asig-table').innerHTML = '<tbody><tr><td class="empty">' + msg + '</td></tr></tbody>'; $('#asig-mobile').innerHTML = '<div class="empty">' + msg + '</div>';
+      return;
+    }
     const filas = filasFiltradas();
     const todos = !S.f.prog;
-    $('#asig-count').textContent = filas.length + ' asignaturas' + (S.f.prog ? ' · ' + S.f.prog : '') + (S.f.comp ? ' · ' + S.f.comp : '');
-    if (!filas.length) { $('#asig-table').innerHTML = '<tbody><tr><td class="empty">No hay asignaturas que coincidan con los filtros.</td></tr></tbody>'; $('#asig-mobile').innerHTML = '<div class="empty">Sin resultados.</div>'; return; }
+    const of = enOferta();
+    $('#asig-count').textContent = filas.length + (of ? ' grupos ofertados' : ' asignaturas') + (S.f.prog ? ' · ' + S.f.prog : '') + (S.f.comp ? ' · ' + S.f.comp : '');
+    if (!filas.length) { $('#asig-table').innerHTML = '<tbody><tr><td class="empty">' + (of ? 'No hay grupos ofertados con ese programa y componente.' : 'No hay asignaturas que coincidan con los filtros.') + '</td></tr></tbody>'; $('#asig-mobile').innerHTML = '<div class="empty">Sin resultados.</div>'; return; }
     const meta = f => esc(f.plan) + (f.semestre !== '' ? ' · Sem. ' + esc(f.semestre) : '') + ' · ' + esc(f.creditos) + ' cr. · ' + esc(f.horas) + ' h';
     const man = f => f.esContinuidad ? ' <span class="tag warn" title="Seleccionado por continuidad desde 2026-II">continuidad</span>' : (f.manual === 'Sí' ? ' <span class="tag warn">manual</span>' : '');
-    const rev = f => f.revision ? ' <span class="tag warn" title="' + esc(f.revision) + '">revisar clasificación</span>' : '';
+    const rev = f => (f.grupoTxt ? ' <span class="tag grupo" title="' + esc(f.acuerdo) + '">' + esc(f.grupoTxt) + '</span>' : '') + (f.revision ? ' <span class="tag warn" title="' + esc(f.revision) + '">revisar clasificación</span>' : '');
     const h7 = !!(S.fuentes && S.fuentes.historico7);
     const TIPO7 = { 'continuidad': ['Continuidad', 'tipo-continuidad'], 'progresión': ['Progresión PPI', 'tipo-progresion'], 'nueva': ['Nueva', 'tipo-nueva'], 'pendiente': ['Pendiente', 'tipo-pendiente'] };
     const ant = f => { const x = f.f7; if (!x || !TIPO7[x.tipo]) return '<span class="muted">—</span>'; const prev = x.origen ? x.origen.nombre : (x.prev26 || []).join('; '); return '<span class="col-tipo-cont ' + TIPO7[x.tipo][1] + '">● ' + TIPO7[x.tipo][0] + '</span>' + (prev ? '<div class="col-prev">2026-II: ' + esc(prev) + '</div>' : ''); };
@@ -503,7 +660,7 @@
         (h7 ? '<td class="small col-antecedente">' + ant(f) + '</td>' : '') +
         '<td>' + (f.docente === 'Por designar' ? '<span class="muted">Por designar</span>' : '<b>' + esc(f.docente) + '</b>') + man(f) + '</td>' +
         (h7 ? '<td class="num">' + (f.f7 && f.f7.cargaTotal != null ? '<span' + (f.f7.cargaTotal > S.config.maxHoras ? ' style="color:var(--danger);font-weight:700"' : '') + '>' + f.f7.cargaTotal + ' h</span>' : '<span class="muted">—</span>') + '</td>' : '') + '<td class="num">' + (f.puntaje !== '' ? '<span class="score">' + f.puntaje + '</span>' : '<span class="muted">—</span>') + '</td><td>' + chip(f.estado) + '</td></tr>').join('') + '</tbody>';
-    $('#asig-mobile').innerHTML = filas.map(f => '<div class="mrow" data-id="' + f.id + '"><div class="l1"><div><div class="asig-name">' + esc(f.asignatura) + '</div><div class="asig-meta">' + (todos ? esc(corto(f.programa)) + ' · ' : '') + meta(f) + '</div></div>' + chip(f.estado) + '</div><div class="doc">' + compTag(f.componente) + ' ' + (f.docente === 'Por designar' ? '<span class="muted">Por designar</span>' : esc(f.docente)) + man(f) + '</div>' + (h7 ? '<div class="col-antecedente" style="margin-top:6px;padding:6px 8px;border-radius:7px">' + ant(f) + '</div>' : '') + '</div>').join('');
+    $('#asig-mobile').innerHTML = filas.map(f => '<div class="mrow" data-id="' + f.id + '"><div class="l1"><div><div class="asig-name">' + esc(f.asignatura) + (f.grupoTxt ? ' <span class="tag grupo">' + esc(f.grupoTxt) + '</span>' : '') + '</div><div class="asig-meta">' + (todos ? esc(corto(f.programa)) + ' · ' : '') + meta(f) + '</div></div>' + chip(f.estado) + '</div><div class="doc">' + compTag(f.componente) + ' ' + (f.docente === 'Por designar' ? '<span class="muted">Por designar</span>' : esc(f.docente)) + man(f) + '</div>' + (h7 ? '<div class="col-antecedente" style="margin-top:6px;padding:6px 8px;border-radius:7px">' + ant(f) + '</div>' : '') + '</div>').join('');
     $$('#asig-table tr[data-id], #asig-mobile [data-id]').forEach(el => {
       el.onclick = () => abrirDetalle(el.dataset.id);
       el.onkeydown = e => { if (e.key === 'Enter') abrirDetalle(el.dataset.id); };
@@ -534,7 +691,7 @@
     const perfil = c.perfilId ? perfilPorId().get(c.perfilId) : null;
     const prof = r.docenteId ? profPorId().get(r.docenteId) : null;
     const o = S.overrides[id] || {};
-    $('#dr-head').innerHTML = '<div style="margin-bottom:6px">' + chip(r.estado) + ' ' + compTag(c.componente) + '</div><h3>' + esc(c.asignatura) + '</h3><div class="muted small">' + esc(c.programa) + ' · ' + esc(c.plan) + '</div>';
+    $('#dr-head').innerHTML = '<div style="margin-bottom:6px">' + chip(r.estado) + ' ' + compTag(c.componente) + (c.grupo ? ' <span class="tag grupo">Grupo ' + c.grupo + ' de ' + c.gruposTotal + '</span>' : '') + '</div><h3>' + esc(c.asignatura) + '</h3><div class="muted small">' + esc(c.programa) + ' · ' + esc(c.plan) + (c.acuerdo ? ' · ' + esc(c.acuerdo) : '') + '</div>';
     const h = [];
     // Datos de la asignatura
     h.push('<div class="card"><div class="card-b"><div class="kv">' +
@@ -727,7 +884,9 @@
     const c = cursoPorId().get(id), r = S.an.resultados.get(id);
     const prof = r.docenteId ? profPorId().get(r.docenteId) : null;
     const o = S.overrides[id] || {};
-    const base = { cursoId: id, programa: c.programa, asignatura: c.asignatura };
+    const base = { cursoId: id, programa: c.programa, asignatura: c.asignatura + (c.grupo ? ' (grupo ' + c.grupo + ' de ' + c.gruposTotal + ')' : '') };
+    // La homologación de perfil es de la asignatura: en la Asignación 2027-I vale para todos sus grupos.
+    const idsPerfil = c.ofertaId ? S.ds.cursos.filter(x => x.ofertaId === c.ofertaId).map(x => x.id) : [id];
     if (act === 'aprobar') {
       const nombreAprobar = prof ? prof.nombre : r.docenteNombre;
       const v = await modal({ titulo: 'Aprobar asignación', ok: 'Aprobar', html: '<div>Se aprobará la asignación de <b>' + esc(nombreAprobar) + '</b> a <b>' + esc(c.asignatura) + '</b>. La decisión se conservará en futuras actualizaciones y exportaciones.</div>' + (r.estado === EST.VALID ? '<div class="notice" style="margin:0">La asignación estaba pendiente de validación: confirme que verificó los requisitos señalados.</div>' : '') + (!prof && r.esContinuidad ? '<div class="notice" style="margin:0">Este docente no figura en la base de formación y experiencia; se aprueba como caso especial de continuidad desde 2026-II.</div>' : '') + '<label class="f">Observación (opcional)<textarea class="inp" name="motivo"></textarea></label>' });
@@ -758,12 +917,14 @@
       const p = perfilPorId().get(pid);
       const v = await modal({ titulo: 'Homologar perfil', ok: 'Homologar', html: '<div>Se usará el perfil <b>' + esc(p.titulo) + '</b> (' + esc(p.programa) + ') para evaluar la asignatura <b>' + esc(c.asignatura) + '</b>.</div><label class="f">Motivo académico (obligatorio)<textarea class="inp" name="motivo"></textarea></label>', validar: d => d.motivo.trim().length < 5 ? 'Indique el motivo.' : null });
       if (!v) return;
-      S.overrides[id] = Object.assign({}, o, { perfilId: pid, perfilMotivo: v.motivo.trim() });
+      idsPerfil.forEach(k => { S.overrides[k] = Object.assign({}, S.overrides[k] || {}, { perfilId: pid, perfilMotivo: v.motivo.trim() }); });
       await registrar(Object.assign({ accion: 'Homologación de perfil', antes: 'Perfil no disponible', despues: p.titulo, motivo: v.motivo.trim() }, base));
     } else if (act === 'quitarhom') {
       if (!await confirmar('Quitar homologación', 'La asignatura volverá a quedar con su perfil original (o «Perfil no disponible»).')) return;
-      const n = Object.assign({}, o); delete n.perfilId; delete n.perfilMotivo;
-      if (Object.keys(n).length) S.overrides[id] = n; else delete S.overrides[id];
+      idsPerfil.forEach(k => {
+        const n = Object.assign({}, S.overrides[k] || {}); delete n.perfilId; delete n.perfilMotivo;
+        if (Object.keys(n).length) S.overrides[k] = n; else delete S.overrides[k];
+      });
       await registrar(Object.assign({ accion: 'Retiro de homologación', antes: 'Perfil homologado', despues: 'Perfil original' }, base));
     }
     await guardarDecisiones(act + ': ' + c.asignatura);

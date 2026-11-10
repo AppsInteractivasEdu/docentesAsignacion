@@ -132,6 +132,15 @@
             <p>Seleccione un programa y componente. Pulse una asignatura para ver el perfil requerido, candidatos y justificación.</p>
           </div>
         </div>
+        <div class="vista-bar" id="vista-bar">
+          <span class="vista-lbl">Vista</span>
+          <div class="seg" role="tablist" aria-label="Vista de la asignación">
+            <button type="button" class="seg-b active" role="tab" data-vista="general" aria-selected="true">Planes de estudio</button>
+            <button type="button" class="seg-b" role="tab" data-vista="oferta" aria-selected="false">Asignación 2027-I <span class="seg-n" id="seg-n"></span></button>
+          </div>
+          <span class="oferta-estado" id="oferta-estado" aria-live="polite"></span>
+        </div>
+        <div class="oferta-banner hidden" id="oferta-banner"></div>
         <div class="card">
           <div class="filters">
             <label class="f">Programa académico<select class="inp" id="f-prog"></select></label>
@@ -424,6 +433,7 @@
   <script src="js/engine.js"></script>
   <script src="js/reportes.js"></script>
   <script src="scripts/perfiles_firebase.js"></script>
+  <script src="js/oferta.js"></script>
   <!-- Perfiles docentes EN VIVO desde Firestore (perfilesPublicos, lectura pública): sin esto, app.js usa solo lo que trae data/datos_base.js (congelado desde la última vez que se corrió generar.js). -->
   <script src="data/datos_base.js"></script>
   <script src="data/historico_2026II.js"></script>

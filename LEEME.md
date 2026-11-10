@@ -7,6 +7,15 @@ Herramienta de apoyo del Departamento de Pedagogía y Didáctica para proponer, 
 - **Directo:** abrir `index.html` en Chrome o Edge (funciona sin internet; la tipografía Inter/Plus Jakarta Sans requiere conexión la primera vez y, si no hay, se usa una fuente del sistema).
 - La primera vez se crea el usuario Administrador. Los datos (usuarios, decisiones) se guardan **en el navegador y por dirección**: `file://` y `localhost:8765` son almacenes distintos. Use siempre la misma forma de abrirla o restaure un respaldo `.json`.
 
+## Asignación 2027-I (oferta de grupos definida por los directores de programa)
+En la pestaña **Asignación docente** hay un selector **Vista**: «Planes de estudio» (todas las asignaturas de los planes, como siempre) y **«Asignación 2027-I»**.
+- Esta vista muestra **únicamente** lo que cada director de programa definió en el aplicativo de Perfiles Docentes (panel «Oferta de grupos 2027-I»): **un curso por cada grupo ofertado**. Las asignaturas marcadas «SIN OFERTAR» (y las que aún no se han definido) no aparecen.
+- Solo permite los filtros de **programa** y **componente**.
+- Cada grupo se trata como una asignatura aparte: perfil requerido, antecedente 2026-II, propuesta de docente, alternativas, aprobación y decisiones manuales. Se **prefiere proponer docentes distintos** en cada grupo de una misma asignatura; el mismo docente solo se repite si no hay otro candidato y le caben las horas (tope de carga). Las decisiones manuales de un grupo se conservan si el director cambia después el número de grupos; la homologación de perfil de una asignatura vale para todos sus grupos.
+- Se actualiza **en tiempo real**: lee la colección `ofertas2027I` de Firestore (`js/oferta.js`: SDK de Firebase con `onSnapshot`). **La colección es privada**: cada director solo ve la de su programa y solo la cuenta del Director de Departamento (`adminpedagogia@unimagdalena.app`) ve todas, por lo que esta vista pide iniciar sesión con esa cuenta una sola vez por equipo (botón «🔑 Iniciar sesión» junto al selector; la sesión queda guardada y la contraseña no se almacena aquí). Requiere internet; sin sesión la vista no muestra grupos. Guarda una copia local para abrir sin conexión. El indicador junto al selector muestra el estado de la sincronización, y «Avance por programa» cuántas asignaturas ya definió cada director.
+- Los Excel que se descargan estando en esta vista llevan las columnas **Grupo** y **Acuerdo académico**, y el nombre del archivo empieza por `Oferta_2027-I_`.
+- El resto de las pestañas siguen trabajando con los planes de estudio.
+
 ## Regenerar los datos base (`data/datos_base.js`)
 Ese archivo (no editar a mano) se genera con:
 ```
