@@ -7,6 +7,17 @@ Herramienta de apoyo del Departamento de Pedagogía y Didáctica para proponer, 
 - **Directo:** abrir `index.html` en Chrome o Edge (funciona sin internet; la tipografía Inter/Plus Jakarta Sans requiere conexión la primera vez y, si no hay, se usa una fuente del sistema).
 - La primera vez se crea el usuario Administrador. Los datos (usuarios, decisiones) se guardan **en el navegador y por dirección**: `file://` y `localhost:8765` son almacenes distintos. Use siempre la misma forma de abrirla o restaure un respaldo `.json`.
 
+## Regenerar los datos base (`data/datos_base.js`)
+Ese archivo (no editar a mano) se genera con:
+```
+cd scripts
+npm install        # solo la primera vez
+node generar.js    # lee la carpeta padre del proyecto (o la que se le pase como argumento)
+```
+Lee de la carpeta indicada: `*plan*.xlsx` (plan de estudios), el archivo de formación académica (`*formaci*.xlsx`) y el de experiencia (`*experiencia*.xlsx`) de los profesores.
+
+**Los perfiles docentes por asignatura (pregrado, posgrado, experiencia, competencias, idoneidad) ya NO se leen de los `.docx` "Perfil docente *.docx".** Se leen en vivo desde `perfilesPublicos`, una colección pública de solo lectura en el Firestore del aplicativo [perfiles-docentes](https://appsinteractivasedu.github.io/PerfilesdeProgramas/) (ver `scripts/perfiles_firebase.js`). Así siempre se usa el último texto aprobado por el Director de Departamento en ese aplicativo, sin pasos manuales ni archivos Word que mantener sincronizados. Requiere conexión a internet al generar; no necesita credenciales (la colección es de lectura pública).
+
 ## Archivos nuevos o modificados en la Fase 7
 | Archivo | Cambio |
 |---|---|

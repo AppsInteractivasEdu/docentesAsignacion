@@ -1,15 +1,17 @@
 /*
- * Lee los archivos fuente de la carpeta del proyecto (planes, perfiles Word y bases de profesores)
- * y construye las "fuentes" normalizadas que usa la aplicación.
- * Uso (Node 18+ con los paquetes xlsx y jszip instalados):
+ * Lee los archivos fuente de la carpeta del proyecto (planes y bases de
+ * profesores) y los perfiles docentes en vivo desde Firestore
+ * (perfilesPublicos, ver perfiles_firebase.js), y construye las "fuentes"
+ * normalizadas que usa la aplicación.
+ * Uso (Node 18+ con el paquete xlsx instalado):
  *   node scripts/cargar_fuentes.js <carpeta_fuentes>
  */
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const XLSX = require('xlsx');
-const JSZip = require('jszip');
 const Engine = require('../js/engine.js');
+const { obtenerPerfilDocs } = require('./perfiles_firebase.js');
 
 function leerHoja(buf, sheetPref) {
   const wb = XLSX.read(buf, { type: 'buffer', cellDates: false, raw: false });
@@ -22,8 +24,12 @@ async function cargar(dir, opts) {
   const files = fs.readdirSync(dir).filter(f => !f.startsWith('~$') && !f.startsWith('.'));
   const archivos = [];
   const fuentes = { planes: [], perfilDocs: [], formacion: null, experiencia: null };
-  const reg = (tipo, f, buf, detalle, filas) => archivos.push({
-    tipo, nombre: f, detalle, filas, tamano: buf.length, cargado: fs.statSync(path.join(dir, f)).mtime.toISOString(),
+  // mtimeISO: para las fuentes que no vienen de un archivo en disco (perfiles,
+  // leídos en vivo de Firestore), se usa la fecha de esta generación en vez
+  // de fs.statSync sobre un archivo que no existe.
+  const reg = (tipo, f, buf, detalle, filas, mtimeISO) => archivos.push({
+    tipo, nombre: f, detalle, filas, tamano: buf.length,
+    cargado: mtimeISO || fs.statSync(path.join(dir, f)).mtime.toISOString(),
     huella: crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16),
   });
 
@@ -34,15 +40,26 @@ async function cargar(dir, opts) {
     fuentes.planes.push({ archivo: f, plan: p.plan, rows: p.rows });
     reg('Plan de estudios', f, buf, p.plan + ' · hoja "' + hoja + '" · ' + p.rows.length + ' filas', p.rows.length);
   }
-  const progs = Engine.inventario(fuentes.planes).programas;
-  for (const f of files.filter(f => /perfil/i.test(f) && /\.docx$/i.test(f))) {
-    const buf = fs.readFileSync(path.join(dir, f));
-    const zip = await JSZip.loadAsync(buf);
-    const xml = await zip.file('word/document.xml').async('string');
-    const r = Engine.parsePerfiles(Engine.docxParagraphs(xml), f, progs);
-    fuentes.perfilDocs.push({ archivo: f, programaDetectado: r.programaDetectado, programa: r.programa, perfiles: r.perfiles });
-    reg('Perfiles docentes', f, buf, (r.programa || 'Programa no identificado') + ' · ' + r.perfiles.length + ' perfiles', r.perfiles.length);
+
+  // Perfiles docentes: en vez de parsear los .docx "Perfil docente *.docx"
+  // (que quedaban congelados desde que se crearon), se leen en vivo de la
+  // colección pública perfilesPublicos del aplicativo perfiles-docentes —
+  // siempre el último texto aprobado por el Director de Departamento. Ver
+  // scripts/perfiles_firebase.js.
+  const ahoraISO = new Date(opts.hoy || Date.now()).toISOString();
+  const perfilDocs = await obtenerPerfilDocs();
+  for (const d of perfilDocs) {
+    fuentes.perfilDocs.push(d);
+    reg(
+      'Perfiles docentes',
+      d.archivo,
+      Buffer.from(JSON.stringify(d)),
+      (d.programaDetectado || 'Programa no identificado') + ' · ' + d.perfiles.length + ' perfiles (Firestore: perfilesPublicos)',
+      d.perfiles.length,
+      ahoraISO
+    );
   }
+
   const fForm = files.find(f => /formaci/i.test(f) && /\.xlsx$/i.test(f));
   if (fForm) {
     const buf = fs.readFileSync(path.join(dir, fForm));

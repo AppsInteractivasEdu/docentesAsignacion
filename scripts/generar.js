@@ -1,7 +1,7 @@
 /*
  * Genera el conjunto de datos base de la aplicación y los reportes Excel iniciales.
  * Uso:  node scripts/generar.js [carpeta_fuentes]
- * Requiere Node 18+ y los paquetes: xlsx, jszip, exceljs  (npm i xlsx jszip exceljs)
+ * Requiere Node 18+ y los paquetes: xlsx, exceljs  (npm i xlsx exceljs)
  */
 const fs = require('fs');
 const path = require('path');
