@@ -8,8 +8,20 @@
  *
  * No requiere credenciales: esa colección es de lectura pública (ver
  * firestore.rules del proyecto perfiles-de-programas). Usa el fetch nativo
- * de Node 18+ contra la API REST de Firestore.
+ * (Node 18+ o navegador) contra la API REST de Firestore.
+ *
+ * Funciona tanto en Node (require('./perfiles_firebase.js'), usado por
+ * scripts/cargar_fuentes.js al generar data/datos_base.js) como en el
+ * navegador (<script src="scripts/perfiles_firebase.js">, usado por
+ * js/app.js para refrescar los perfiles EN VIVO cada vez que se abre la
+ * aplicación, sin depender de que alguien haya corrido generar.js).
  */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.PerfilesFirebase = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
 const PROJECT_ID = 'perfiles-de-programas';
 const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/perfilesPublicos`;
 
@@ -141,10 +153,11 @@ async function obtenerPerfilDocs() {
     }));
 }
 
-module.exports = { obtenerPerfilDocs };
+  return { obtenerPerfilDocs };
+});
 
-if (require.main === module) {
-  obtenerPerfilDocs()
+if (typeof module === 'object' && module.exports && require.main === module) {
+  module.exports.obtenerPerfilDocs()
     .then((docs) => {
       console.log(`Programas leídos de Firestore: ${docs.length}`);
       for (const d of docs) console.log(`  ${d.programaDetectado}: ${d.perfiles.length} asignaturas`);

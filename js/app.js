@@ -278,6 +278,31 @@
   /* ================================================================== */
   /* Carga de datos y análisis                                           */
   /* ================================================================== */
+  /**
+   * Reemplaza S.fuentes.perfilDocs por lo último aprobado en Firestore
+   * (perfilesPublicos), sin esperar a que alguien corra scripts/generar.js.
+   * No toca planes/formación/experiencia (eso sigue viniendo de los Excel
+   * cargados). Si falla (sin internet, etc.) se deja lo que ya había —
+   * nunca bloquea la entrada a la aplicación.
+   */
+  async function refrescarPerfilesEnVivo(silencioso) {
+    if (!window.PerfilesFirebase) return false;
+    try {
+      const docs = await window.PerfilesFirebase.obtenerPerfilDocs();
+      if (docs && docs.length) {
+        S.fuentes.perfilDocs = docs;
+        S.fuentesMod = true;
+        await Store.set('fuentes', S.fuentes);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.warn('No se pudieron refrescar los perfiles docentes en vivo desde Firestore (se usan los disponibles localmente):', e);
+      if (!silencioso) toast('No se pudo conectar con los perfiles docentes en vivo; se usan los cargados localmente.', true);
+      return false;
+    }
+  }
+
   async function entrar() {
     $('#auth').classList.add('hidden');
     $('#app').classList.remove('hidden');
@@ -302,6 +327,7 @@
       }
       else if (window.DATOS_BASE) { S.fuentes = JSON.parse(JSON.stringify(window.DATOS_BASE.fuentes)); S.archivos = window.DATOS_BASE.archivos.slice(); }
       else S.fuentes = { planes: [], perfilDocs: [], formacion: null, experiencia: null };
+      await refrescarPerfilesEnVivo();
       S.overrides = (await Store.get('overrides')) || {};
       S.excepciones7 = (await Store.get('excepciones7')) || [];
       S.config = Object.assign({}, E.DEFAULT_CONFIG, (await Store.get('config')) || {});
@@ -1056,10 +1082,25 @@
 
     // Respaldo
     $('#backup').innerHTML = '<div class="small muted" style="margin-bottom:10px">Almacenamiento: <b>' + (Store.modo === 'indexeddb' ? 'IndexedDB del navegador' : 'localStorage (limitado)') + '</b>. Los datos se conservan al cerrar o actualizar la aplicación. Descargue respaldos periódicos para conservarlos fuera del navegador.</div>' +
-      '<div class="btn-row" style="margin-bottom:12px"><button class="btn primary" id="bk-exp">Descargar respaldo (.json)</button>' + (can('restaurar') ? '<button class="btn" id="bk-imp">Restaurar desde respaldo</button><button class="btn danger" id="bk-base">Restaurar archivos base</button>' : '') + '</div>' +
+      '<div class="btn-row" style="margin-bottom:12px"><button class="btn primary" id="bk-exp">Descargar respaldo (.json)</button>' +
+      '<button class="btn" id="bk-perfiles" title="Vuelve a traer los perfiles docentes más recientes desde el aplicativo de perfiles-docentes, sin tocar los demás archivos cargados">⟳ Actualizar perfiles docentes (en vivo)</button>' +
+      (can('restaurar') ? '<button class="btn" id="bk-imp">Restaurar desde respaldo</button><button class="btn danger" id="bk-base">Restaurar archivos base</button>' : '') + '</div>' +
       '<input type="file" id="bk-file" accept=".json" class="hidden">' +
       '<div class="small"><b>Puntos de restauración automáticos</b> (últimos ' + S.snapshots.length + ')</div><div class="file-list">' +
       (S.snapshots.slice(0, 8).map((s, i) => '<div class="file-item"><div><div>' + esc(s.motivo) + '</div><div class="meta">' + fmtF(s.fecha) + ' · ' + esc(s.usuario) + ' · ' + Object.keys(s.overrides).length + ' decisiones</div></div>' + (can('restaurar') ? '<button class="btn sm" data-snap="' + i + '">Restaurar</button>' : '') + '</div>').join('') || '<div class="muted small">Aún no hay puntos de restauración.</div>') + '</div>';
+    $('#bk-perfiles').onclick = async () => {
+      loading(true, 'Consultando perfiles docentes…');
+      await tick();
+      const ok = await refrescarPerfilesEnVivo(true);
+      if (ok) {
+        await registrar({ accion: 'Actualización en vivo de perfiles docentes' });
+        loading(true, 'Recalculando…'); await tick(); await reconstruir(); poblarFiltros(); loading(false);
+        toast('Perfiles docentes actualizados con lo último aprobado en perfiles-docentes.');
+      } else {
+        loading(false);
+        toast('No se pudo conectar con los perfiles docentes en vivo (revise su conexión a internet).', true);
+      }
+    };
     $('#bk-exp').onclick = async () => {
       const data = { app: 'asignacion-docente-licenciaturas', version: E.VERSION, fecha: new Date().toISOString(), usuario: S.user.usuario, overrides: S.overrides, config: S.config, log: S.log, users: S.users, snapshots: S.snapshots, fuentes: S.fuentesMod ? S.fuentes : null, archivos: S.fuentesMod ? S.archivos : null };
       guardarBlob(JSON.stringify(data), 'Respaldo_Asignacion_Docente_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json', 'application/json');
