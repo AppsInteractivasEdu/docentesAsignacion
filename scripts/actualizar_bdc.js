@@ -1,12 +1,14 @@
 /*
- * Actualiza SOLO la base de profesores (BDC: formación + experiencia) a partir de un único
- * archivo consolidado (hoja "Report" con columnas IDENTIFICACIÓN, NOMBRE, ..., FORMACIÓN
+ * Actualiza SOLO la base de profesores (BDC: formación + experiencia) a partir de un
+ * archivo de experiencia (hoja "Report" con columnas IDENTIFICACIÓN, NOMBRE, ..., FORMACIÓN
  * ACADÉMICA, EMPRESA, TIPO DE EXPERIENCIA, FECHA INICIO, FECHA FIN, DURACIÓN, ESTADO ACTUAL,
- * UNIDAD ACADÉMICA). Reutiliza los planes de estudio ya guardados en data/datos_base.js (no
- * hace falta volver a cargar esos Excel) y refresca los perfiles docentes en vivo desde
- * Firestore, igual que scripts/generar.js.
+ * UNIDAD ACADÉMICA) y, opcionalmente, un archivo de formación académica aparte (columnas
+ * IDENTIFICACIÓN, NOMBRE, NIVEL DE FORMACIÓN, PROGRAMA, INSTITUCIÓN, ...) que reemplaza el
+ * fallback de texto por títulos verificados. Reutiliza los planes de estudio ya guardados en
+ * data/datos_base.js (no hace falta volver a cargar esos Excel) y refresca los perfiles
+ * docentes en vivo desde Firestore, igual que scripts/generar.js.
  *
- * Uso:  node scripts/actualizar_bdc.js "ruta/al/BDC.xlsx"
+ * Uso:  node scripts/actualizar_bdc.js "ruta/al/BDC.xlsx" ["ruta/a/FORMACION.xlsx"]
  */
 const fs = require('fs');
 const path = require('path');
@@ -19,9 +21,11 @@ const { obtenerPerfilDocs } = require('./perfiles_firebase.js');
 
 const APP = path.join(__dirname, '..');
 const BDC_FILE = path.resolve(process.argv[2]);
+const FORMACION_FILE = process.argv[3] ? path.resolve(process.argv[3]) : null;
 
 (async () => {
   if (!fs.existsSync(BDC_FILE)) { console.error('No encuentro el archivo:', BDC_FILE); process.exit(1); }
+  if (FORMACION_FILE && !fs.existsSync(FORMACION_FILE)) { console.error('No encuentro el archivo:', FORMACION_FILE); process.exit(1); }
   const hoy = Date.now();
   const ahoraISO = new Date(hoy).toISOString();
 
@@ -47,10 +51,22 @@ const BDC_FILE = path.resolve(process.argv[2]);
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[hojaNombre], { defval: '', raw: false });
   const exp = Engine.procesarExperiencia(rows, hoy);
 
+  // 3b. Formación académica aparte (opcional) — reemplaza el fallback de texto por títulos verificados.
+  let formacion = null, bufForm = null, formNombre = null, formHoja = null;
+  if (FORMACION_FILE) {
+    bufForm = fs.readFileSync(FORMACION_FILE);
+    const wbForm = XLSX.read(bufForm, { type: 'buffer', cellDates: false, raw: false });
+    formHoja = wbForm.SheetNames.find(n => /^report$/i.test(n)) || wbForm.SheetNames[0];
+    const rowsForm = XLSX.utils.sheet_to_json(wbForm.Sheets[formHoja], { defval: '', raw: false });
+    const form = Engine.procesarFormacion(rowsForm);
+    formNombre = path.basename(FORMACION_FILE);
+    formacion = { archivo: formNombre, personas: [...form.profesores.values()] };
+  }
+
   const fuentes = {
     planes,
     perfilDocs,
-    formacion: null, // el motor extrae los títulos del texto "FORMACIÓN ACADÉMICA" de la experiencia
+    formacion, // null => el motor extrae los títulos del texto "FORMACIÓN ACADÉMICA" de la experiencia
     experiencia: { archivo: path.basename(BDC_FILE), personas: [...exp.experiencia.values()] },
   };
 
@@ -65,10 +81,17 @@ const BDC_FILE = path.resolve(process.argv[2]);
     });
   });
   archivos.push({
-    tipo: 'Profesores – formación y experiencia (BDC)', nombre: path.basename(BDC_FILE),
+    tipo: formacion ? 'Profesores – experiencia (BDC)' : 'Profesores – formación y experiencia (BDC)', nombre: path.basename(BDC_FILE),
     detalle: 'hoja "' + hojaNombre + '" · ' + exp.filas + ' registros · ' + exp.experiencia.size + ' personas',
     filas: exp.filas, tamano: buf.length, cargado: ahoraISO, huella: huella(buf),
   });
+  if (formacion) {
+    archivos.push({
+      tipo: 'Profesores – formación académica', nombre: formNombre,
+      detalle: 'hoja "' + formHoja + '" · ' + formacion.personas.reduce((s, p) => s + p.titulos.length, 0) + ' títulos · ' + formacion.personas.length + ' personas',
+      filas: formacion.personas.length, tamano: bufForm.length, cargado: ahoraISO, huella: huella(bufForm),
+    });
+  }
 
   const { ds, meta } = Engine.construirDataset(fuentes);
   meta.archivos = archivos;
@@ -97,7 +120,8 @@ const BDC_FILE = path.resolve(process.argv[2]);
 
   // 6. Resumen en consola
   const st = ctx.stats;
-  console.log('BDC:', exp.experiencia.size, 'profesores (', exp.filas, 'registros de experiencia/formación )');
+  console.log('BDC experiencia:', exp.experiencia.size, 'profesores (', exp.filas, 'registros )');
+  if (formacion) console.log('Formación académica:', formacion.personas.length, 'profesores (', formacion.personas.reduce((s, p) => s + p.titulos.length, 0), 'títulos )');
   console.log('Programas:', st.programas, '| Asignaturas:', st.total, JSON.stringify(st.porComp));
   console.log('Estados:', JSON.stringify(st.porEstado));
   console.log('Docentes con carga:', st.docentes);
