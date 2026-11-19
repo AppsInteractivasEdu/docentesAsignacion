@@ -599,8 +599,7 @@
       (!S.ofertas.length ? '<div class="notice" style="margin:8px 0 0">Todavía no hay asignaturas con oferta. Los directores de programa la definen en el aplicativo de Perfiles Docentes, en su panel «Oferta 2027-I».</div>' :
         '<details class="oferta-det"><summary>Avance por programa</summary><div class="table-wrap"><table class="t"><thead><tr><th>Programa</th><th class="num">Asignaturas</th><th class="num">Con oferta</th><th class="num">Grupos</th><th class="num">Sin ofertar</th><th class="num">Por definir</th><th>Última actualización</th></tr></thead><tbody>' +
         filas.map(p => '<tr><td>' + fmtP(p.programa) + '</td><td class="num">' + p.total + '</td><td class="num">' + p.ofertadas + '</td><td class="num"><b>' + p.grupos + '</b></td><td class="num">' + p.sinOfertar + '</td><td class="num">' + (p.pendientes ? '<span class="tag warn">' + p.pendientes + '</span>' : '0') + '</td><td class="small">' + (p.ultima ? new Date(p.ultima).toLocaleString('es-CO') : '—') + '</td></tr>').join('') +
-        '</tbody></table></div></details>') +
-      (S.O && S.O.sinCruce && S.O.sinCruce.length ? '<div class="notice" style="margin:8px 0 0">No se pudieron clasificar ' + S.O.sinCruce.length + ' asignaturas ofertadas: ' + S.O.sinCruce.map(o => esc(o.asignatura)).join('; ') + '.</div>' : '');
+        '</tbody></table></div></details>');
   }
   /** Inicio de sesión (Director de Departamento del aplicativo de Perfiles Docentes) para leer la oferta, que no es pública. */
   async function iniciarSesionOferta() {
