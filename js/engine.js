@@ -1447,6 +1447,12 @@
         gruposTotal: c.gruposTotal || '',
         grupoTxt: c.grupo ? 'Grupo ' + c.grupo + ' de ' + c.gruposTotal : '',
         acuerdo: c.acuerdo || '',
+        grupoClave: c.grupoClave || '',
+        slot: c.slot || 1,
+        slotsTotal: c.slotsTotal || 1,
+        slotNombre: c.slotNombre || '',
+        estudiantesGrupo: c.estudiantesGrupo != null ? c.estudiantesGrupo : '',
+        estudiantesSlot: c.estudiantesSlot != null ? c.estudiantesSlot : '',
       };
     });
   }
@@ -1592,31 +1598,51 @@
         const mejor = lista.map(c => { const tc = tokens(c.asignatura); return { c, s: overlap(t, tc) / Math.max(t.length, tc.length || 1) }; }).sort((a, b) => b.s - a.s)[0];
         if (mejor && mejor.s >= 0.8) base = mejor.c;
       }
+      // Asignatura del formato que no está en los planes cargados: se clasifica UNA vez por oferta
+      // (no depende del grupo ni del subgrupo).
+      let clSinBase = null;
+      if (!base) {
+        clSinBase = clasificar(o.asignatura, o.componente);
+        if (!clSinBase && /^didactic/.test(norm(o.asignatura))) {
+          clSinBase = { componente: COMP.DID, revision: 'El formato de necesidades la clasifica como «' + o.componente + '»; se trató como Didáctica de las Disciplinas. Revisar.' };
+        }
+        if (!clSinBase) { sinCruce.push(o); return; }
+      }
       const n = Math.min(10, Math.floor(Number(o.grupos)));
       for (let g = 1; g <= n; g++) {
-        let c;
-        if (base) {
-          c = Object.assign({}, base);
-          if (base._orig) Object.assign(c, base._orig); // vínculo de perfil original, sin homologaciones manuales
-        } else {
-          // Asignatura del formato que no está en los planes cargados: se arma con lo que trae el formato.
-          let cl = clasificar(o.asignatura, o.componente);
-          if (!cl && /^didactic/.test(norm(o.asignatura))) {
-            cl = { componente: COMP.DID, revision: 'El formato de necesidades la clasifica como «' + o.componente + '»; se trató como Didáctica de las Disciplinas. Revisar.' };
+        // Un grupo puede repartirse en varios subgrupos por docente (p. ej. Práctica Profesional con
+        // dos docentes): `subgrupos[g-1]` = { mismoDocente, lista:[{nombre,estudiantes}, ...] }. Si hay
+        // 2 o más y NO es el mismo docente, cada subgrupo se convierte en un curso propio (misma
+        // asignatura/perfil, decisión de docente independiente); si es un solo docente, sigue siendo
+        // un único curso, como antes.
+        const subCfg = o.subgrupos && o.subgrupos[g - 1];
+        const slots = (subCfg && !subCfg.mismoDocente && Array.isArray(subCfg.lista) && subCfg.lista.length >= 2) ? subCfg.lista : null;
+        const estudiantesGrupo = (o.estudiantes && o.estudiantes[g - 1] != null) ? Number(o.estudiantes[g - 1]) : null;
+        const grupoClave = o.id + '|' + g;
+        const numSlots = slots ? slots.length : 1;
+        for (let s = 1; s <= numSlots; s++) {
+          let c;
+          if (base) {
+            c = Object.assign({}, base);
+            if (base._orig) Object.assign(c, base._orig); // vínculo de perfil original, sin homologaciones manuales
+          } else {
+            c = {
+              id: '', plan: o.plan, programa: o.nombrePrograma, componente: clSinBase.componente, componenteOficial: o.componente,
+              revisionClasificacion: clSinBase.revision, codigo: '', asignatura: o.asignatura, creditos: Number(o.creditos) || 0,
+              semestre: '', prerrequisitos: '', archivoPlan: 'Formato de necesidades 2027-I',
+              perfilId: null, perfilMatch: null, perfilNota: '', perfilSugerido: null,
+            };
+            nuevos.push(c);
           }
-          if (!cl) { if (g === 1) sinCruce.push(o); break; }
-          c = {
-            id: '', plan: o.plan, programa: o.nombrePrograma, componente: cl.componente, componenteOficial: o.componente,
-            revisionClasificacion: cl.revision, codigo: '', asignatura: o.asignatura, creditos: Number(o.creditos) || 0,
-            semestre: '', prerrequisitos: '', archivoPlan: 'Formato de necesidades 2027-I',
-            perfilId: null, perfilMatch: null, perfilNota: '', perfilSugerido: null,
-          };
-          nuevos.push(c);
+          c.id = hash('oferta27|' + o.id + '|' + g + (numSlots > 1 ? '|s' + s : ''));
+          c.baseId = base ? base.id : null;
+          c.ofertaId = o.id; c.grupo = g; c.gruposTotal = n; c.acuerdo = o.acuerdo || '';
+          c.grupoClave = grupoClave; c.slot = s; c.slotsTotal = numSlots;
+          c.slotNombre = slots ? (slots[s - 1].nombre || ('Docente ' + s)) : '';
+          c.estudiantesGrupo = estudiantesGrupo;
+          c.estudiantesSlot = slots ? (slots[s - 1].estudiantes != null ? Number(slots[s - 1].estudiantes) : null) : estudiantesGrupo;
+          cursos.push(c);
         }
-        c.id = hash('oferta27|' + o.id + '|' + g);
-        c.baseId = base ? base.id : null;
-        c.ofertaId = o.id; c.grupo = g; c.gruposTotal = n; c.acuerdo = o.acuerdo || '';
-        cursos.push(c);
       }
     });
     if (nuevos.length) vincularPerfiles(nuevos, ds.perfiles);

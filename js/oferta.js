@@ -9,7 +9,11 @@
  * viaja a Firebase Authentication; esta aplicación no la guarda.
  *
  * Cada fila entregada: { id, programaId, nombrePrograma, acuerdo, plan, asignatura, creditos,
- *   componente, orden, grupos (null = sin definir, 0 = SIN OFERTAR, 1..10), actualizadoPor, actualizadoEn (ms) }
+ *   componente, orden, grupos (null = sin definir, 0 = SIN OFERTAR, 1..10),
+ *   estudiantes (null, o lista paralela a los grupos: cada entrada null o 0..50),
+ *   subgrupos (null, o lista paralela a los grupos: cada entrada null o { mismoDocente, lista:[{nombre,estudiantes}] } —
+ *     reparto de ese grupo entre varios docentes, p. ej. Práctica Profesional),
+ *   actualizadoPor, actualizadoEn (ms) }
  *
  * Estado que se informa (onEstado): { modo, ok, ultima, usuario, error } con modo =
  *   'conectando' | 'requiere-sesion' | 'tiempo-real' | 'sin-permiso' | 'sin-conexion'
@@ -39,7 +43,10 @@
     return {
       id, programaId: d.programaId, nombrePrograma: d.nombrePrograma, acuerdo: d.acuerdo, plan: d.plan,
       asignatura: d.asignatura, creditos: d.creditos, componente: d.componente, orden: d.orden,
-      grupos: d.grupos == null ? null : Number(d.grupos), actualizadoPor: d.actualizadoPor || '', actualizadoEn: t || null,
+      grupos: d.grupos == null ? null : Number(d.grupos),
+      estudiantes: Array.isArray(d.estudiantes) ? d.estudiantes : null,
+      subgrupos: Array.isArray(d.subgrupos) ? d.subgrupos : null,
+      actualizadoPor: d.actualizadoPor || '', actualizadoEn: t || null,
     };
   }
 

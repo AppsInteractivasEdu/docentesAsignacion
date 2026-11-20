@@ -35,6 +35,15 @@
   --danger:      #b53c1a;   --danger-soft:#fde9e3;  --danger-mid:#d95030;
   --gray:        #57627a;   --gray-soft: #eceef5;   --gray-mid: #8591a8;
 
+  /* Docentes de un mismo grupo repartido en subgrupos (Práctica Profesional / PPI VI, etc.):
+     un color discreto por docente para marcar dónde termina la asignación de uno y empieza la
+     del siguiente, sin competir con los semánticos de arriba (ok/warn/danger). */
+  --slot1: #2f6fb0; --slot1-soft: #e8f1fb;
+  --slot2: #7a4fb0; --slot2-soft: #f1ebfb;
+  --slot3: #1e8a7a; --slot3-soft: #e3f6f3;
+  --slot4: #b0527a; --slot4-soft: #fbebf1;
+  --slot5: #a67c1e; --slot5-soft: #faf1df;
+
   /* DiseÃ±o */
   --shadow-sm:  0 1px 3px rgba(20,30,60,.07), 0 1px 2px rgba(20,30,60,.04);
   --shadow:     0 2px 8px rgba(20,30,60,.08), 0 1px 3px rgba(20,30,60,.05);
@@ -60,6 +69,7 @@
     --text:#edf0f8; --text-2:#c8d0e6; --muted:#a4afc8; --muted-2:#8392b4;
     --primary:#7ba8f0; --primary-2:#9cc0f8; --primary-soft:#182344; --primary-mid:#6090e8; --accent:#e0a844; --accent-soft:#2a1f08; --accent-2:#e8c070;
     --focus:#7ba8f0; --ok:#4ec87a; --ok-soft:#0d2a1a; --ok-mid:#5ad080; --info:#7ab0f5; --info-soft:#0d1f3c; --warn:#f0c060; --warn-soft:#2a1e06; --danger:#f09070; --danger-soft:#2a1008; --danger-mid:#e06040; --gray:#7080a0; --gray-soft:#1c2440; --gray-mid:#5a6888;
+    --slot1:#7ba8f0; --slot1-soft:#182344; --slot2:#b494f0; --slot2-soft:#241a3c; --slot3:#4ecdb8; --slot3-soft:#0d2a26; --slot4:#f08cb4; --slot4-soft:#3a1a28; --slot5:#e0c060; --slot5-soft:#2a2408;
     --shadow-sm:0 1px 3px rgba(0,0,0,.5); --shadow:0 2px 8px rgba(0,0,0,.5); --shadow-md:0 4px 16px rgba(0,0,0,.55); --shadow-lg:0 8px 32px rgba(0,0,0,.6);
   }
 }
@@ -69,6 +79,7 @@
   --text:#edf0f8; --text-2:#c8d0e6; --muted:#a4afc8; --muted-2:#8392b4;
   --primary:#7ba8f0; --primary-2:#9cc0f8; --primary-soft:#182344; --primary-mid:#6090e8; --accent:#e0a844; --accent-soft:#2a1f08; --accent-2:#e8c070;
   --focus:#7ba8f0; --ok:#4ec87a; --ok-soft:#0d2a1a; --ok-mid:#5ad080; --info:#7ab0f5; --info-soft:#0d1f3c; --warn:#f0c060; --warn-soft:#2a1e06; --danger:#f09070; --danger-soft:#2a1008; --danger-mid:#e06040; --gray:#7080a0; --gray-soft:#1c2440; --gray-mid:#5a6888;
+  --slot1:#7ba8f0; --slot1-soft:#182344; --slot2:#b494f0; --slot2-soft:#241a3c; --slot3:#4ecdb8; --slot3-soft:#0d2a26; --slot4:#f08cb4; --slot4-soft:#3a1a28; --slot5:#e0c060; --slot5-soft:#2a2408;
   --shadow-sm:0 1px 3px rgba(0,0,0,.5); --shadow:0 2px 8px rgba(0,0,0,.5); --shadow-md:0 4px 16px rgba(0,0,0,.55); --shadow-lg:0 8px 32px rgba(0,0,0,.6);
 }
 
@@ -948,3 +959,20 @@ select.inp { cursor: pointer; }
 .oferta-det summary { cursor: pointer; font-weight: 600; color: var(--primary); }
 .tag.grupo { background: var(--primary-soft); color: var(--primary); border: 1px solid transparent; font-weight: 700; }
 .f.desactivado { opacity: .5; }
+
+/* Grupo repartido en varios docentes (subgrupos): un color discreto por docente, tanto en la lista
+   (punto de color junto al nombre) como en el detalle (franja + encabezado de cada bloque). */
+.slot-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.slot-dot.slot-1, .slot-wrap.slot-1, .slot-head.slot-1 { --slot-c: var(--slot1); --slot-s: var(--slot1-soft); }
+.slot-dot.slot-2, .slot-wrap.slot-2, .slot-head.slot-2 { --slot-c: var(--slot2); --slot-s: var(--slot2-soft); }
+.slot-dot.slot-3, .slot-wrap.slot-3, .slot-head.slot-3 { --slot-c: var(--slot3); --slot-s: var(--slot3-soft); }
+.slot-dot.slot-4, .slot-wrap.slot-4, .slot-head.slot-4 { --slot-c: var(--slot4); --slot-s: var(--slot4-soft); }
+.slot-dot.slot-5, .slot-wrap.slot-5, .slot-head.slot-5 { --slot-c: var(--slot5); --slot-s: var(--slot5-soft); }
+.slot-dot { background: var(--slot-c); }
+.slot-head {
+  margin: 14px 0 8px; padding: 6px 12px; border-radius: 8px;
+  background: var(--slot-s); color: var(--slot-c); font-weight: 700; font-size: 13.5px;
+  border-left: 4px solid var(--slot-c);
+}
+.slot-wrap { border-left: 3px solid var(--slot-c); border-radius: 0 var(--radius) var(--radius) 0; padding-left: 12px; margin-left: 1px; }
+.slot-wrap .card { margin-bottom: 10px; }

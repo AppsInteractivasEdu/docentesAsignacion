@@ -629,6 +629,39 @@
     aplicarVista();
   });
 
+  // Prioridad del estado "más pendiente" cuando un grupo se reparte en varios docentes (subgrupos):
+  // la fila combinada que se ve en la lista muestra el estado menos avanzado de todos sus docentes.
+  const PRIORIDAD_ESTADO = [EST.PEND, EST.DIR, EST.SINP, EST.VALID, EST.VALDOC, EST.PROP, EST.APROB];
+  const peorEstado = estados => PRIORIDAD_ESTADO.find(e => estados.includes(e)) || estados[0];
+  /**
+   * Agrupa, SOLO para la lista de la Asignación 2027-I, las filas que comparten un mismo grupo real
+   * (grupoClave) cuando ese grupo se repartió en varios docentes (subgrupos): se ve una sola fila por
+   * grupo —no una por docente—, con los nombres de los docentes y el estado menos avanzado de todos.
+   * El detalle (abrirDetalle) sí muestra cada docente por separado, coloreado para diferenciarlos.
+   */
+  function agruparPorGrupo(filas) {
+    const porClave = new Map();
+    filas.forEach(f => {
+      if (!(f.slotsTotal > 1)) return;
+      if (!porClave.has(f.grupoClave)) porClave.set(f.grupoClave, []);
+      porClave.get(f.grupoClave).push(f);
+    });
+    const vistos = new Set(), out = [];
+    filas.forEach(f => {
+      if (!(f.slotsTotal > 1)) { out.push(f); return; }
+      if (vistos.has(f.grupoClave)) return;
+      vistos.add(f.grupoClave);
+      const hermanas = porClave.get(f.grupoClave).slice().sort((a, b) => a.slot - b.slot);
+      const base = hermanas[0];
+      out.push(Object.assign({}, base, {
+        docente: hermanas.map(x => '<span class="slot-dot slot-' + x.slot + '"></span>' + esc(x.docente)).join(' '),
+        docenteEsHtml: true,
+        estado: peorEstado(hermanas.map(x => x.estado)),
+      }));
+    });
+    return out;
+  }
+
   function renderAsignacion() {
     pintarVista();
     if (S.vista27 && !S.O && S.tab === 'asignacion') {
@@ -640,14 +673,15 @@
       $('#asig-table').innerHTML = '<tbody><tr><td class="empty">' + msg + '</td></tr></tbody>'; $('#asig-mobile').innerHTML = '<div class="empty">' + msg + '</div>';
       return;
     }
-    const filas = filasFiltradas();
-    const todos = !S.f.prog;
     const of = enOferta();
+    const filas = of ? agruparPorGrupo(filasFiltradas()) : filasFiltradas();
+    const todos = !S.f.prog;
     $('#asig-count').textContent = filas.length + (of ? ' grupos ofertados' : ' asignaturas') + (S.f.prog ? ' · ' + S.f.prog : '') + (S.f.comp ? ' · ' + S.f.comp : '');
     if (!filas.length) { $('#asig-table').innerHTML = '<tbody><tr><td class="empty">' + (of ? 'No hay grupos ofertados con ese programa y componente.' : 'No hay asignaturas que coincidan con los filtros.') + '</td></tr></tbody>'; $('#asig-mobile').innerHTML = '<div class="empty">Sin resultados.</div>'; return; }
     const meta = f => esc(f.plan) + (f.semestre !== '' ? ' · Sem. ' + esc(f.semestre) : '') + ' · ' + esc(f.creditos) + ' cr. · ' + esc(f.horas) + ' h';
     const man = f => f.esContinuidad ? ' <span class="tag warn" title="Seleccionado por continuidad desde 2026-II">continuidad</span>' : (f.manual === 'Sí' ? ' <span class="tag warn">manual</span>' : '');
-    const rev = f => (f.grupoTxt ? ' <span class="tag grupo" title="' + esc(f.acuerdo) + '">' + esc(f.grupoTxt) + '</span>' : '') + (f.revision ? ' <span class="tag warn" title="' + esc(f.revision) + '">revisar clasificación</span>' : '');
+    const rev = f => (f.grupoTxt ? ' <span class="tag grupo" title="' + esc(f.acuerdo) + '">' + esc(f.grupoTxt) + (f.slotsTotal > 1 ? ' · ' + f.slotsTotal + ' docentes' : '') + '</span>' : '') + (f.revision ? ' <span class="tag warn" title="' + esc(f.revision) + '">revisar clasificación</span>' : '');
+    const docHtml = f => f.docenteEsHtml ? f.docente : esc(f.docente);
     const h7 = !!(S.fuentes && S.fuentes.historico7);
     const TIPO7 = { 'continuidad': ['Continuidad', 'tipo-continuidad'], 'progresión': ['Progresión PPI', 'tipo-progresion'], 'nueva': ['Nueva', 'tipo-nueva'], 'pendiente': ['Pendiente', 'tipo-pendiente'] };
     const ant = f => { const x = f.f7; if (!x || !TIPO7[x.tipo]) return '<span class="muted">—</span>'; const prev = x.origen ? x.origen.nombre : (x.prev26 || []).join('; '); return '<span class="col-tipo-cont ' + TIPO7[x.tipo][1] + '">● ' + TIPO7[x.tipo][0] + '</span>' + (prev ? '<div class="col-prev">2026-II: ' + esc(prev) + '</div>' : ''); };
@@ -657,9 +691,9 @@
       filas.map(f => '<tr class="click" data-id="' + f.id + '" tabindex="0"><td><div class="asig-name">' + esc(f.asignatura) + rev(f) + '</div><div class="asig-meta">' + meta(f) + '</div></td>' +
         (todos ? '<td class="small">' + esc(corto(f.programa)) + '</td>' : '') + '<td>' + compTag(f.componente) + '</td>' +
         (h7 ? '<td class="small col-antecedente">' + ant(f) + '</td>' : '') +
-        '<td>' + (f.docente === 'Por designar' ? '<span class="muted">Por designar</span>' : '<b>' + esc(f.docente) + '</b>') + man(f) + '</td>' +
+        '<td>' + (f.docente === 'Por designar' ? '<span class="muted">Por designar</span>' : '<b>' + docHtml(f) + '</b>') + man(f) + '</td>' +
         (h7 ? '<td class="num">' + (f.f7 && f.f7.cargaTotal != null ? '<span' + (f.f7.cargaTotal > S.config.maxHoras ? ' style="color:var(--danger);font-weight:700"' : '') + '>' + f.f7.cargaTotal + ' h</span>' : '<span class="muted">—</span>') + '</td>' : '') + '<td class="num">' + (f.puntaje !== '' ? '<span class="score">' + f.puntaje + '</span>' : '<span class="muted">—</span>') + '</td><td>' + chip(f.estado) + '</td></tr>').join('') + '</tbody>';
-    $('#asig-mobile').innerHTML = filas.map(f => '<div class="mrow" data-id="' + f.id + '"><div class="l1"><div><div class="asig-name">' + esc(f.asignatura) + (f.grupoTxt ? ' <span class="tag grupo">' + esc(f.grupoTxt) + '</span>' : '') + '</div><div class="asig-meta">' + (todos ? esc(corto(f.programa)) + ' · ' : '') + meta(f) + '</div></div>' + chip(f.estado) + '</div><div class="doc">' + compTag(f.componente) + ' ' + (f.docente === 'Por designar' ? '<span class="muted">Por designar</span>' : esc(f.docente)) + man(f) + '</div>' + (h7 ? '<div class="col-antecedente" style="margin-top:6px;padding:6px 8px;border-radius:7px">' + ant(f) + '</div>' : '') + '</div>').join('');
+    $('#asig-mobile').innerHTML = filas.map(f => '<div class="mrow" data-id="' + f.id + '"><div class="l1"><div><div class="asig-name">' + esc(f.asignatura) + (f.grupoTxt ? ' <span class="tag grupo">' + esc(f.grupoTxt) + (f.slotsTotal > 1 ? ' · ' + f.slotsTotal + ' docentes' : '') + '</span>' : '') + '</div><div class="asig-meta">' + (todos ? esc(corto(f.programa)) + ' · ' : '') + meta(f) + '</div></div>' + chip(f.estado) + '</div><div class="doc">' + compTag(f.componente) + ' ' + (f.docente === 'Por designar' ? '<span class="muted">Por designar</span>' : docHtml(f)) + man(f) + '</div>' + (h7 ? '<div class="col-antecedente" style="margin-top:6px;padding:6px 8px;border-radius:7px">' + ant(f) + '</div>' : '') + '</div>').join('');
     $$('#asig-table tr[data-id], #asig-mobile [data-id]').forEach(el => {
       el.onclick = () => abrirDetalle(el.dataset.id);
       el.onkeydown = e => { if (e.key === 'Enter') abrirDetalle(el.dataset.id); };
@@ -690,7 +724,7 @@
     const perfil = c.perfilId ? perfilPorId().get(c.perfilId) : null;
     const prof = r.docenteId ? profPorId().get(r.docenteId) : null;
     const o = S.overrides[id] || {};
-    $('#dr-head').innerHTML = '<div style="margin-bottom:6px">' + chip(r.estado) + ' ' + compTag(c.componente) + (c.grupo ? ' <span class="tag grupo">Grupo ' + c.grupo + ' de ' + c.gruposTotal + '</span>' : '') + '</div><h3>' + esc(c.asignatura) + '</h3><div class="muted small">' + esc(c.programa) + ' · ' + esc(c.plan) + (c.acuerdo ? ' · ' + esc(c.acuerdo) : '') + '</div>';
+    $('#dr-head').innerHTML = '<div style="margin-bottom:6px">' + chip(r.estado) + ' ' + compTag(c.componente) + (c.grupo ? ' <span class="tag grupo">Grupo ' + c.grupo + ' de ' + c.gruposTotal + (c.slotsTotal > 1 ? ' · ' + c.slotsTotal + ' docentes' : '') + '</span>' : '') + '</div><h3>' + esc(c.asignatura) + '</h3><div class="muted small">' + esc(c.programa) + ' · ' + esc(c.plan) + (c.acuerdo ? ' · ' + esc(c.acuerdo) : '') + '</div>';
     const h = [];
     // Datos de la asignatura
     h.push('<div class="card"><div class="card-b"><div class="kv">' +
@@ -710,59 +744,87 @@
         '</div>' + ((x.bloqueos || []).length ? '<ul class="obs" style="margin-top:8px">' + x.bloqueos.map(b => '<li><b>' + esc(b.nombre) + '</b> (' + esc(b.t) + ' desde 2026-II) no continúa automáticamente: ' + esc(b.motivo) + '.' + (can('editar') && b.id ? ' <button class="btn sm" style="margin-left:6px" data-cont-id="' + esc(b.id) + '" data-cont-nom="' + esc(b.nombre) + '" data-cont-tipo="' + esc(b.t) + '">' + (b.t === 'progresión' ? 'Seleccionar por progresión' : 'Seleccionar por continuidad') + '</button>' : '') + '</li>').join('') + '</ul>' : '') + '</div></div>');
     }
 
-    // Docente asignado + acciones
-    const acciones = [];
-    if (can('aprobar') && !r.aprobado && ((prof && r.ev && r.ev.tier > 0) || (!prof && r.esContinuidad && r.docenteNombre))) acciones.push('<button class="btn ok" data-act="aprobar">✓ Aprobar asignación</button>');
-    if (can('aprobar') && r.aprobado) acciones.push('<button class="btn" data-act="revocar">Revocar aprobación</button>');
-    if (can('editar') && perfil && !r.forzadoPorDesignar) acciones.push('<button class="btn" data-act="pordesignar">Marcar «Por designar»</button>');
-    if (can('editar') && (o.docenteId || o.accion || o.aprobado)) acciones.push('<button class="btn" data-act="restablecer">Restablecer propuesta automática</button>');
-    const carga = r.docenteId ? (r.f7 && r.f7.cargaTotal != null ? r.f7.cargaTotal : (S.an.carga.get(r.docenteId) || 0)) : 0;
-    h.push('<div class="card"><div class="card-h"><h3>Docente propuesto 2027-I</h3><div class="btn-row">' + acciones.join('') + '</div></div><div class="card-b">' +
-      (prof ? '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div style="font-size:16px;font-weight:700">' + esc(prof.nombre) + (r.esContinuidad ? ' <span class="tag warn">por continuidad 2026-II</span>' : (r.manual ? ' <span class="tag warn">asignación manual</span>' : '')) + '</div><div class="small muted">' + esc(E.nivelCorrespondencia(r.ev)) + ' · puntaje ' + (r.ev ? r.ev.score : '—') + '/100</div></div>' +
-        '<div class="small">Carga total: <b>' + carga + ' / ' + S.config.maxHoras + ' h</b> <span class="loadbar"><span class="' + (carga > S.config.maxHoras ? 'full' : '') + '" style="width:' + Math.min(100, carga / S.config.maxHoras * 100) + '%"></span></span></div></div>' +
-        '<p class="small" style="margin:10px 0 0"><b>Pregrado:</b> ' + esc((prof.titulos.find(t => t.nivel === 'Profesional') || {}).titulo || 'no registrado') + ' — <b>' + esc(r.ev && r.ev.pre ? (r.ev.pre.s === 'A' ? 'afín con la asignatura' : r.ev.pre.s === 'N' ? 'no afín con la asignatura (requiere revisión del Director)' : r.ev.pre.s === 'I' && r.ev.pre.sinReq ? 'el perfil no exige un pregrado específico' : 'afinidad por validar') : '') + '</b></p>' +
-        '<p class="small" style="margin:6px 0 0">' + esc(E.resumenProfesor(prof)) + '</p>'
-        : (r.esContinuidad && r.docenteNombre ?
-          '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div style="font-size:16px;font-weight:700">' + esc(r.docenteNombre) + ' <span class="tag warn">por continuidad 2026-II</span></div>' +
+    // Docente(s) asignado(s) + acciones. Cuando el grupo se repartió en varios subgrupos por docente
+    // (ver admiteSubgrupos en el aplicativo de Perfiles Docentes), cada subgrupo es, para el motor,
+    // una asignación independiente (mismo perfil/candidatos, decisión de docente propia): se resuelve
+    // y se guarda igual que cualquier curso, solo que aquí se ven todas las del mismo grupo juntas,
+    // cada una en su color, para que quede claro dónde termina la de un docente y empieza la del otro.
+    const slots = c.slotsTotal > 1
+      ? [...cursoPorId().values()].filter(x => x.grupoClave === c.grupoClave).sort((a, b) => a.slot - b.slot)
+      : [c];
+    const multi = slots.length > 1;
+
+    slots.forEach(cSlot => {
+      const rSlot = S.an.resultados.get(cSlot.id);
+      const perfilSlot = cSlot.perfilId ? perfilPorId().get(cSlot.perfilId) : null;
+      const profSlot = rSlot.docenteId ? profPorId().get(rSlot.docenteId) : null;
+      const oSlot = S.overrides[cSlot.id] || {};
+      const sid = cSlot.id;
+      const env = x => multi ? '<div class="slot-wrap slot-' + cSlot.slot + '">' + x + '</div>' : x;
+
+      if (multi) {
+        h.push('<div class="slot-head slot-' + cSlot.slot + '">' + esc(cSlot.slotNombre || ('Docente ' + cSlot.slot)) +
+          (cSlot.estudiantesSlot != null ? ' <span class="small" style="font-weight:400">· ' + cSlot.estudiantesSlot + ' estudiantes</span>' : '') + '</div>');
+      }
+
+      const acciones = [];
+      if (can('aprobar') && !rSlot.aprobado && ((profSlot && rSlot.ev && rSlot.ev.tier > 0) || (!profSlot && rSlot.esContinuidad && rSlot.docenteNombre))) acciones.push('<button class="btn ok" data-act="aprobar" data-id="' + sid + '">✓ Aprobar asignación</button>');
+      if (can('aprobar') && rSlot.aprobado) acciones.push('<button class="btn" data-act="revocar" data-id="' + sid + '">Revocar aprobación</button>');
+      if (can('editar') && perfilSlot && !rSlot.forzadoPorDesignar) acciones.push('<button class="btn" data-act="pordesignar" data-id="' + sid + '">Marcar «Por designar»</button>');
+      if (can('editar') && (oSlot.docenteId || oSlot.accion || oSlot.aprobado)) acciones.push('<button class="btn" data-act="restablecer" data-id="' + sid + '">Restablecer propuesta automática</button>');
+      const carga = rSlot.docenteId ? (rSlot.f7 && rSlot.f7.cargaTotal != null ? rSlot.f7.cargaTotal : (S.an.carga.get(rSlot.docenteId) || 0)) : 0;
+      h.push(env('<div class="card"><div class="card-h"><h3>Docente propuesto 2027-I</h3><div class="btn-row">' + acciones.join('') + '</div></div><div class="card-b">' +
+        (profSlot ? '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div style="font-size:16px;font-weight:700">' + esc(profSlot.nombre) + (rSlot.esContinuidad ? ' <span class="tag warn">por continuidad 2026-II</span>' : (rSlot.manual ? ' <span class="tag warn">asignación manual</span>' : '')) + '</div><div class="small muted">' + esc(E.nivelCorrespondencia(rSlot.ev)) + ' · puntaje ' + (rSlot.ev ? rSlot.ev.score : '—') + '/100</div></div>' +
           '<div class="small">Carga total: <b>' + carga + ' / ' + S.config.maxHoras + ' h</b> <span class="loadbar"><span class="' + (carga > S.config.maxHoras ? 'full' : '') + '" style="width:' + Math.min(100, carga / S.config.maxHoras * 100) + '%"></span></span></div></div>' +
-          '<p class="small muted" style="margin:10px 0 0">Sin ficha en la base de formación y experiencia — no es posible verificar el cumplimiento del perfil; queda pendiente de validación documental.</p>'
-          : '<div style="font-size:16px;font-weight:700">Por designar</div>')) +
-      '</div></div>');
+          '<p class="small" style="margin:10px 0 0"><b>Pregrado:</b> ' + esc((profSlot.titulos.find(t => t.nivel === 'Profesional') || {}).titulo || 'no registrado') + ' — <b>' + esc(rSlot.ev && rSlot.ev.pre ? (rSlot.ev.pre.s === 'A' ? 'afín con la asignatura' : rSlot.ev.pre.s === 'N' ? 'no afín con la asignatura (requiere revisión del Director)' : rSlot.ev.pre.s === 'I' && rSlot.ev.pre.sinReq ? 'el perfil no exige un pregrado específico' : 'afinidad por validar') : '') + '</b></p>' +
+          '<p class="small" style="margin:6px 0 0">' + esc(E.resumenProfesor(profSlot)) + '</p>'
+          : (rSlot.esContinuidad && rSlot.docenteNombre ?
+            '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div style="font-size:16px;font-weight:700">' + esc(rSlot.docenteNombre) + ' <span class="tag warn">por continuidad 2026-II</span></div>' +
+            '<div class="small">Carga total: <b>' + carga + ' / ' + S.config.maxHoras + ' h</b> <span class="loadbar"><span class="' + (carga > S.config.maxHoras ? 'full' : '') + '" style="width:' + Math.min(100, carga / S.config.maxHoras * 100) + '%"></span></span></div></div>' +
+            '<p class="small muted" style="margin:10px 0 0">Sin ficha en la base de formación y experiencia — no es posible verificar el cumplimiento del perfil; queda pendiente de validación documental.</p>'
+            : '<div style="font-size:16px;font-weight:700">Por designar</div>')) +
+        '</div></div>'));
 
-    // Observaciones: colapsadas por defecto, cuando hay varias — casos con antecedente/continuidad e
-    // historial de bloqueos pueden acumular muchas líneas y antes siempre quedaban abiertas.
-    const obsAbrir = r.observaciones.length <= 3;
-    h.push('<div class="card"><details class="sec"' + (obsAbrir ? ' open' : '') + '><summary><h3 style="display:inline">Observaciones y justificación</h3> <span class="muted small">(' + r.observaciones.length + ')</span></summary><div class="card-b" style="padding-top:0"><ul class="obs">' + r.observaciones.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div></details></div>');
+      // Observaciones: colapsadas por defecto, cuando hay varias — casos con antecedente/continuidad e
+      // historial de bloqueos pueden acumular muchas líneas y antes siempre quedaban abiertas.
+      const obsAbrir = rSlot.observaciones.length <= 3;
+      h.push(env('<div class="card"><details class="sec"' + (obsAbrir ? ' open' : '') + '><summary><h3 style="display:inline">Observaciones y justificación</h3> <span class="muted small">(' + rSlot.observaciones.length + ')</span></summary><div class="card-b" style="padding-top:0"><ul class="obs">' + rSlot.observaciones.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div></details></div>'));
 
-    // Matriz de correspondencia
-    if (perfil) {
-      const cands = [];
-      if (prof) cands.push({ p: prof, rol: r.manual ? 'Asignado' : 'Propuesto' });
-      r.alternativas.forEach((a, i) => { const p = profPorId().get(a.id); if (p) cands.push({ p, rol: 'Sugerido ' + (i + 1) + ' · pregrado afín' }); });
-      (r.revisionDirector || []).forEach((a, i) => { const p = profPorId().get(a.id); if (p && !cands.some(x => x.p.id === a.id)) cands.push({ p, rol: 'Revisión del Director ' + (i + 1) + ' · posgrado afín' }); });
-      if (S.extraCand && S.extraCand.curso === id) S.extraCand.ids.forEach(pid => { const p = profPorId().get(pid); if (p && !cands.some(x => x.p.id === pid)) cands.push({ p, rol: 'Consultado' }); });
-      const evs = cands.map(x => ({ x, ev: E.evaluar(perfil, x.p, S.config) }));
-      const filasReq = [['Formación de pregrado', 'pre'], ['Formación posgradual', 'pos'], ['Experiencia docente', 'exp'], ['Experiencia específica', 'expEsp'], ['Experiencia investigativa', 'inv'], ['Competencias', 'comp'], ['Hoja de vida (BDC)', 'bdc']];
-      h.push('<div class="card"><div class="card-h"><h3>Profesores que cumplen el perfil (matriz de correspondencia)</h3><span class="small muted">' + (r.nIdoneos || 0) + ' cumplen requisitos verificables · ' + (r.nCandidatos || 0) + ' con correspondencia total o parcial</span></div>' +
-        (evs.length ? '<div class="table-wrap"><table class="t req-table"><thead><tr><th>Requisito</th>' + evs.map(({ x, ev }) => '<th style="min-width:230px;white-space:normal"><div>' + esc(x.rol) + '</div><div style="text-transform:none;color:var(--text);font-size:13px">' + esc(x.p.nombre) + '</div><div style="text-transform:none" class="small"><span class="score">' + (ev.score != null ? ev.score : '—') + '</span> ' + esc(E.nivelCorrespondencia(ev)) + ' · carga ' + (S.an.carga.get(x.p.id) || 0) + ' h</div>' +
-          (can('editar') && x.p.id !== r.docenteId ? '<button class="btn sm" style="margin-top:6px" data-asignar="' + esc(x.p.id) + '">Asignar este docente</button>' : '') + '</th>').join('') + '</tr></thead><tbody>' +
-          filasReq.map(([lbl, k]) => '<tr><td>' + lbl + '</td>' + evs.map(({ ev }) => '<td>' + celdaReq(ev[k]) + '</td>').join('') + '</tr>').join('') +
-          (perfil.otros.length ? '<tr><td>Otros requisitos</td>' + evs.map(({ ev }) => '<td class="small">' + esc((ev.otros || []).map(o2 => o2.nombre + ': ' + E.R[o2.s]).join('; ') || '—') + '</td>').join('') + '</tr>' : '') +
-          '</tbody></table></div>' : '<div class="card-b muted">Ningún profesor de la base acredita los requisitos obligatorios de este perfil.</div>') +
-        (can('editar') ? '<div class="card-b" style="border-top:1px solid var(--border)"><label class="f">Consultar o asignar otro profesor de la base<input class="inp" id="busca-prof" type="search" placeholder="Escriba al menos 3 letras del nombre…"></label><div class="cand-list" id="busca-res" style="margin-top:8px"></div></div>' : '') +
-        '</div>');
-    } else {
-      // Sin perfil: homologación
-      const sug = c._orig && c._orig.perfilId ? null : (c.perfilSugerido ? perfilPorId().get(c.perfilSugerido) : null);
-      const opciones = S.ds.perfiles.filter(p => p.programa === c.programa || p.programa === c.programa.replace(/\s*\(Distancia\)/i, '')).sort((a, b) => a.titulo.localeCompare(b.titulo, 'es'));
-      h.push('<div class="card"><div class="card-h"><h3>Perfil no disponible</h3></div><div class="card-b">' +
-        '<p style="margin-top:0">' + esc(c.perfilNota || 'No se encontró un perfil docente definido para esta asignatura.') + '</p>' +
-        (can('editar') && opciones.length ? '<label class="f">Homologar con un perfil existente (decisión académica, queda registrada)<select class="inp" id="hom-sel"><option value="">— Seleccione —</option>' + opciones.map(p => '<option value="' + p.id + '"' + (sug && sug.id === p.id ? ' selected' : '') + '>' + esc(p.titulo + ' · ' + corto(p.programa)) + '</option>').join('') + '</select></label><div class="btn-row" style="margin-top:8px"><button class="btn primary" data-act="homologar">Homologar perfil</button></div>' : '') +
-        '</div></div>');
-    }
-    if (o.perfilId && can('editar')) h.push('<div class="notice info">Esta asignatura usa un perfil homologado manualmente. <button class="btn sm" data-act="quitarhom">Quitar homologación</button></div>');
+      // Matriz de correspondencia
+      if (perfilSlot) {
+        const cands = [];
+        if (profSlot) cands.push({ p: profSlot, rol: rSlot.manual ? 'Asignado' : 'Propuesto' });
+        rSlot.alternativas.forEach((a, i) => { const p = profPorId().get(a.id); if (p) cands.push({ p, rol: 'Sugerido ' + (i + 1) + ' · pregrado afín' }); });
+        (rSlot.revisionDirector || []).forEach((a, i) => { const p = profPorId().get(a.id); if (p && !cands.some(x => x.p.id === a.id)) cands.push({ p, rol: 'Revisión del Director ' + (i + 1) + ' · posgrado afín' }); });
+        if (S.extraCand && S.extraCand.curso === sid) S.extraCand.ids.forEach(pid => { const p = profPorId().get(pid); if (p && !cands.some(x => x.p.id === pid)) cands.push({ p, rol: 'Consultado' }); });
+        const evs = cands.map(x => ({ x, ev: E.evaluar(perfilSlot, x.p, S.config) }));
+        const filasReq = [['Formación de pregrado', 'pre'], ['Formación posgradual', 'pos'], ['Experiencia docente', 'exp'], ['Experiencia específica', 'expEsp'], ['Experiencia investigativa', 'inv'], ['Competencias', 'comp'], ['Hoja de vida (BDC)', 'bdc']];
+        h.push(env('<div class="card"><div class="card-h"><h3>Profesores que cumplen el perfil (matriz de correspondencia)</h3><span class="small muted">' + (rSlot.nIdoneos || 0) + ' cumplen requisitos verificables · ' + (rSlot.nCandidatos || 0) + ' con correspondencia total o parcial</span></div>' +
+          (evs.length ? '<div class="table-wrap"><table class="t req-table"><thead><tr><th>Requisito</th>' + evs.map(({ x, ev }) => '<th style="min-width:230px;white-space:normal"><div>' + esc(x.rol) + '</div><div style="text-transform:none;color:var(--text);font-size:13px">' + esc(x.p.nombre) + '</div><div style="text-transform:none" class="small"><span class="score">' + (ev.score != null ? ev.score : '—') + '</span> ' + esc(E.nivelCorrespondencia(ev)) + ' · carga ' + (S.an.carga.get(x.p.id) || 0) + ' h</div>' +
+            (can('editar') && x.p.id !== rSlot.docenteId ? '<button class="btn sm" style="margin-top:6px" data-asignar="' + esc(x.p.id) + '" data-id="' + sid + '">Asignar este docente</button>' : '') + '</th>').join('') + '</tr></thead><tbody>' +
+            filasReq.map(([lbl, k]) => '<tr><td>' + lbl + '</td>' + evs.map(({ ev }) => '<td>' + celdaReq(ev[k]) + '</td>').join('') + '</tr>').join('') +
+            (perfilSlot.otros.length ? '<tr><td>Otros requisitos</td>' + evs.map(({ ev }) => '<td class="small">' + esc((ev.otros || []).map(o2 => o2.nombre + ': ' + E.R[o2.s]).join('; ') || '—') + '</td>').join('') + '</tr>' : '') +
+            '</tbody></table></div>' : '<div class="card-b muted">Ningún profesor de la base acredita los requisitos obligatorios de este perfil.</div>') +
+          (can('editar') ? '<div class="card-b" style="border-top:1px solid var(--border)"><label class="f">Consultar o asignar otro profesor de la base<input class="inp" id="busca-prof-' + sid + '" type="search" placeholder="Escriba al menos 3 letras del nombre…"></label><div class="cand-list" id="busca-res-' + sid + '" style="margin-top:8px"></div></div>' : '') +
+          '</div>'));
+      } else {
+        // Sin perfil: homologación
+        const sug = cSlot._orig && cSlot._orig.perfilId ? null : (cSlot.perfilSugerido ? perfilPorId().get(cSlot.perfilSugerido) : null);
+        const opciones = S.ds.perfiles.filter(p => p.programa === cSlot.programa || p.programa === cSlot.programa.replace(/\s*\(Distancia\)/i, '')).sort((a, b) => a.titulo.localeCompare(b.titulo, 'es'));
+        h.push(env('<div class="card"><div class="card-h"><h3>Perfil no disponible</h3></div><div class="card-b">' +
+          '<p style="margin-top:0">' + esc(cSlot.perfilNota || 'No se encontró un perfil docente definido para esta asignatura.') + '</p>' +
+          (can('editar') && opciones.length ? '<label class="f">Homologar con un perfil existente (decisión académica, queda registrada)<select class="inp" id="hom-sel-' + sid + '"><option value="">— Seleccione —</option>' + opciones.map(p => '<option value="' + p.id + '"' + (sug && sug.id === p.id ? ' selected' : '') + '>' + esc(p.titulo + ' · ' + corto(p.programa)) + '</option>').join('') + '</select></label><div class="btn-row" style="margin-top:8px"><button class="btn primary" data-act="homologar" data-id="' + sid + '" data-hom-sel="hom-sel-' + sid + '">Homologar perfil</button></div>' : '') +
+          '</div></div>'));
+      }
+      if (oSlot.perfilId && can('editar')) h.push(env('<div class="notice info">Esta asignatura usa un perfil homologado manualmente. <button class="btn sm" data-act="quitarhom" data-id="' + sid + '">Quitar homologación</button></div>'));
 
-    // Perfil requerido
+      // Historial de esta asignación (por docente: cada subgrupo tiene sus propias decisiones)
+      const hist = S.log.filter(e => e.cursoId === sid).slice().reverse();
+      if (hist.length) h.push(env('<div class="card"><div class="card-h"><h3>Historial de esta asignación</h3></div><div class="table-wrap"><table class="t"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Anterior</th><th>Nuevo</th><th>Motivo</th></tr></thead><tbody>' +
+        hist.map(e => '<tr><td class="nowrap small">' + fmtF(e.fecha) + '</td><td>' + esc(e.usuario) + '</td><td>' + esc(e.accion) + '</td><td>' + esc(e.antes || '') + '</td><td>' + esc(e.despues || '') + '</td><td>' + esc(e.motivo || '') + '</td></tr>').join('') + '</tbody></table></div></div>'));
+    });
+
+    // Perfil requerido: es el mismo para todo el grupo (misma asignatura), se muestra una sola vez.
     if (perfil) {
       const sec = (t, x, open) => x ? '<details class="sec"' + (open ? ' open' : '') + '><summary>' + t + '</summary><p>' + esc(x) + '</p></details>' : '';
       h.push('<div class="card"><div class="card-h"><h3>Perfil requerido por la asignatura</h3></div><div class="card-b">' +
@@ -773,28 +835,25 @@
         (perfil.alertas.length ? '<div class="notice" style="margin:10px 0 0">Alertas del documento: ' + esc(perfil.alertas.join(' ')) + '</div>' : '') +
         '</div></div>');
     }
-    // Historial de la asignatura
-    const hist = S.log.filter(e => e.cursoId === id).slice().reverse();
-    if (hist.length) h.push('<div class="card"><div class="card-h"><h3>Historial de esta asignatura</h3></div><div class="table-wrap"><table class="t"><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Anterior</th><th>Nuevo</th><th>Motivo</th></tr></thead><tbody>' +
-      hist.map(e => '<tr><td class="nowrap small">' + fmtF(e.fecha) + '</td><td>' + esc(e.usuario) + '</td><td>' + esc(e.accion) + '</td><td>' + esc(e.antes || '') + '</td><td>' + esc(e.despues || '') + '</td><td>' + esc(e.motivo || '') + '</td></tr>').join('') + '</tbody></table></div></div>');
 
     $('#dr-body').innerHTML = h.join('');
     if (!refrescar) $('#dr-body').scrollTop = 0;
     $('#drawer').classList.add('open'); $('#drawer-bg').classList.add('open'); $('#drawer').setAttribute('aria-hidden', 'false');
 
-    // eventos
-    $$('#dr-body [data-act]').forEach(b => b.onclick = () => accion(b.dataset.act, id));
-    $$('#dr-body [data-asignar]').forEach(b => b.onclick = () => asignarDocente(id, b.dataset.asignar));
-    $$('#dr-body [data-cont-id]').forEach(b => b.onclick = () => asignarPorContinuidad(id, b.dataset.contId, b.dataset.contNom, b.dataset.contTipo));
-    const bp = $('#busca-prof');
-    if (bp) {
+    // eventos (data-id: a qué subgrupo/curso se aplica la acción; si no lo trae, es el único de la asignatura)
+    $$('#dr-body [data-act]').forEach(b => b.onclick = () => accion(b.dataset.act, b.dataset.id || id, b.dataset.homSel));
+    $$('#dr-body [data-asignar]').forEach(b => b.onclick = () => asignarDocente(b.dataset.id || id, b.dataset.asignar));
+    $$('#dr-body [data-cont-id]').forEach(b => b.onclick = () => asignarPorContinuidad(b.dataset.id || id, b.dataset.contId, b.dataset.contNom, b.dataset.contTipo));
+    $$('#dr-body [id^="busca-prof-"]').forEach(bp => {
+      const sid2 = bp.id.slice('busca-prof-'.length);
       let t;
-      bp.oninput = () => { clearTimeout(t); t = setTimeout(() => buscarProfesor(id, bp.value), 200); };
-    }
+      bp.oninput = () => { clearTimeout(t); t = setTimeout(() => buscarProfesor(sid2, bp.value), 200); };
+    });
   }
 
   function buscarProfesor(cursoId, q) {
-    const box = $('#busca-res');
+    const box = $('#busca-res-' + cursoId);
+    if (!box) return;
     q = E.norm(q);
     if (q.length < 3) { box.innerHTML = ''; return; }
     const c = cursoPorId().get(cursoId);
@@ -807,7 +866,7 @@
       return '<div class="cand"><div><div class="n">' + esc(p.nombre) + '</div><div class="small muted">' + esc((p.titulos.filter(t => t.nivel === 'Profesional')[0] || {}).titulo || 'Sin pregrado registrado') + ' · ' + esc(p.estadoBDC) + ' · carga ' + (S.an.carga.get(p.id) || 0) + ' h</div></div><div class="btn-row">' + lbl +
         '<button class="btn sm" data-ver="' + esc(p.id) + '">Ver en matriz</button><button class="btn sm" data-asg="' + esc(p.id) + '">Asignar</button></div></div>';
     }).join('');
-    $$('[data-ver]', box).forEach(b => b.onclick = () => { S.extraCand = { curso: cursoId, ids: [...((S.extraCand && S.extraCand.curso === cursoId) ? S.extraCand.ids : []), b.dataset.ver] }; abrirDetalle(cursoId, true); });
+    $$('[data-ver]', box).forEach(b => b.onclick = () => { S.extraCand = { curso: cursoId, ids: [...((S.extraCand && S.extraCand.curso === cursoId) ? S.extraCand.ids : []), b.dataset.ver] }; abrirDetalle(S.abierto, true); });
     $$('[data-asg]', box).forEach(b => b.onclick = () => asignarDocente(cursoId, b.dataset.asg));
   }
 
@@ -879,11 +938,11 @@
     toast('Selección por continuidad registrada y aprobada.');
   }
 
-  async function accion(act, id) {
+  async function accion(act, id, homSelId) {
     const c = cursoPorId().get(id), r = S.an.resultados.get(id);
     const prof = r.docenteId ? profPorId().get(r.docenteId) : null;
     const o = S.overrides[id] || {};
-    const base = { cursoId: id, programa: c.programa, asignatura: c.asignatura + (c.grupo ? ' (grupo ' + c.grupo + ' de ' + c.gruposTotal + ')' : '') };
+    const base = { cursoId: id, programa: c.programa, asignatura: c.asignatura + (c.grupo ? ' (grupo ' + c.grupo + ' de ' + c.gruposTotal + (c.slotsTotal > 1 ? ', ' + (c.slotNombre || 'Docente ' + c.slot) : '') + ')' : '') };
     // La homologación de perfil es de la asignatura: en la Asignación 2027-I vale para todos sus grupos.
     const idsPerfil = c.ofertaId ? S.ds.cursos.filter(x => x.ofertaId === c.ofertaId).map(x => x.id) : [id];
     if (act === 'aprobar') {
@@ -911,7 +970,7 @@
       if (keep) S.overrides[id] = keep; else delete S.overrides[id];
       await registrar(Object.assign({ accion: 'Restablecimiento de propuesta', antes: prof ? prof.nombre : r.estado, despues: 'Propuesta automática' }, base));
     } else if (act === 'homologar') {
-      const pid = $('#hom-sel').value;
+      const pid = $('#' + (homSelId || 'hom-sel')).value;
       if (!pid) return toast('Seleccione un perfil.', true);
       const p = perfilPorId().get(pid);
       const v = await modal({ titulo: 'Homologar perfil', ok: 'Homologar', html: '<div>Se usará el perfil <b>' + esc(p.titulo) + '</b> (' + esc(p.programa) + ') para evaluar la asignatura <b>' + esc(c.asignatura) + '</b>.</div><label class="f">Motivo académico (obligatorio)<textarea class="inp" name="motivo"></textarea></label>', validar: d => d.motivo.trim().length < 5 ? 'Indique el motivo.' : null });
