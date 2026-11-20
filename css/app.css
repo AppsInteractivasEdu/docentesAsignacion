@@ -963,16 +963,27 @@ select.inp { cursor: pointer; }
 /* Grupo repartido en varios docentes (subgrupos): un color discreto por docente, tanto en la lista
    (punto de color junto al nombre) como en el detalle (franja + encabezado de cada bloque). */
 .slot-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-.slot-dot.slot-1, .slot-wrap.slot-1, .slot-head.slot-1 { --slot-c: var(--slot1); --slot-s: var(--slot1-soft); }
-.slot-dot.slot-2, .slot-wrap.slot-2, .slot-head.slot-2 { --slot-c: var(--slot2); --slot-s: var(--slot2-soft); }
-.slot-dot.slot-3, .slot-wrap.slot-3, .slot-head.slot-3 { --slot-c: var(--slot3); --slot-s: var(--slot3-soft); }
-.slot-dot.slot-4, .slot-wrap.slot-4, .slot-head.slot-4 { --slot-c: var(--slot4); --slot-s: var(--slot4-soft); }
-.slot-dot.slot-5, .slot-wrap.slot-5, .slot-head.slot-5 { --slot-c: var(--slot5); --slot-s: var(--slot5-soft); }
+.slot-dot.slot-1, .slot-wrap.slot-1, .slot-head.slot-1, .slot-tab.slot-1 { --slot-c: var(--slot1); --slot-s: var(--slot1-soft); }
+.slot-dot.slot-2, .slot-wrap.slot-2, .slot-head.slot-2, .slot-tab.slot-2 { --slot-c: var(--slot2); --slot-s: var(--slot2-soft); }
+.slot-dot.slot-3, .slot-wrap.slot-3, .slot-head.slot-3, .slot-tab.slot-3 { --slot-c: var(--slot3); --slot-s: var(--slot3-soft); }
+.slot-dot.slot-4, .slot-wrap.slot-4, .slot-head.slot-4, .slot-tab.slot-4 { --slot-c: var(--slot4); --slot-s: var(--slot4-soft); }
+.slot-dot.slot-5, .slot-wrap.slot-5, .slot-head.slot-5, .slot-tab.slot-5 { --slot-c: var(--slot5); --slot-s: var(--slot5-soft); }
 .slot-dot { background: var(--slot-c); }
-.slot-head {
-  margin: 14px 0 8px; padding: 6px 12px; border-radius: 8px;
-  background: var(--slot-s); color: var(--slot-c); font-weight: 700; font-size: 13.5px;
-  border-left: 4px solid var(--slot-c);
+/* Pestañas para cambiar de docente dentro de un mismo grupo: grandes y en el color de cada uno. */
+.slot-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 6px; }
+.slot-tab {
+  border: 2px solid var(--slot-c); background: var(--slot-s); color: var(--slot-c);
+  font-weight: 700; font-size: 15px; padding: 10px 18px; border-radius: 12px; cursor: pointer;
+  transition: background var(--trans), color var(--trans);
 }
+.slot-tab .n { font-weight: 600; opacity: .85; margin-left: 4px; }
+.slot-tab:hover { filter: brightness(1.05); }
+.slot-tab.active { background: var(--slot-c); color: #fff; box-shadow: var(--shadow-sm); }
+.slot-head {
+  margin: 0 0 10px; padding: 10px 16px; border-radius: 10px;
+  background: var(--slot-s); color: var(--slot-c); font-weight: 800; font-size: 17px;
+  border-left: 5px solid var(--slot-c);
+}
+.slot-head .small { font-size: 14px; }
 .slot-wrap { border-left: 3px solid var(--slot-c); border-radius: 0 var(--radius) var(--radius) 0; padding-left: 12px; margin-left: 1px; }
 .slot-wrap .card { margin-bottom: 10px; }

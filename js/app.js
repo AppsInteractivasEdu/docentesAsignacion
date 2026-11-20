@@ -140,6 +140,7 @@
     // (un curso por cada grupo que los directores de programa decidieron ofertar). S.ds/S.an/S.filas…
     // apuntan siempre al conjunto activo (ver aplicarVista).
     G: null, O: null, ofertas: [], ofertaEstado: null, vista27: false, tab: 'asignacion',
+    slotTab: {}, // { [grupoClave]: numero de docente activo } - pestana elegida en un grupo con varios docentes
   };
   try { S.vista27 = sessionStorage.getItem('ad_vista27') === '1'; } catch (e) { /* sin sessionStorage */ }
   const can = p => S.user && (PERMISOS[S.user.rol] || []).includes(p);
@@ -753,8 +754,18 @@
       ? [...cursoPorId().values()].filter(x => x.grupoClave === c.grupoClave).sort((a, b) => a.slot - b.slot)
       : [c];
     const multi = slots.length > 1;
+    let slotsVisibles = slots;
+    if (multi) {
+      const guardado = S.slotTab[c.grupoClave];
+      const activo = guardado && slots.some(s => s.slot === guardado) ? guardado : slots[0].slot;
+      S.slotTab[c.grupoClave] = activo;
+      h.push('<div class="slot-tabs">' + slots.map(s => '<button type="button" class="slot-tab slot-' + s.slot + (s.slot === activo ? ' active' : '') +
+        '" data-slot-tab="' + s.slot + '" data-grupo-clave="' + esc(c.grupoClave) + '">' + esc(s.slotNombre || ('Docente ' + s.slot)) +
+        (s.estudiantesSlot != null ? ' <span class="n">' + s.estudiantesSlot + ' est.</span>' : '') + '</button>').join('') + '</div>');
+      slotsVisibles = slots.filter(s => s.slot === activo);
+    }
 
-    slots.forEach(cSlot => {
+    slotsVisibles.forEach(cSlot => {
       const rSlot = S.an.resultados.get(cSlot.id);
       const perfilSlot = cSlot.perfilId ? perfilPorId().get(cSlot.perfilId) : null;
       const profSlot = rSlot.docenteId ? profPorId().get(rSlot.docenteId) : null;
@@ -841,6 +852,10 @@
     $('#drawer').classList.add('open'); $('#drawer-bg').classList.add('open'); $('#drawer').setAttribute('aria-hidden', 'false');
 
     // eventos (data-id: a qué subgrupo/curso se aplica la acción; si no lo trae, es el único de la asignatura)
+    $$('#dr-body [data-slot-tab]').forEach(b => b.onclick = () => {
+      S.slotTab[b.dataset.grupoClave] = Number(b.dataset.slotTab);
+      abrirDetalle(id, true);
+    });
     $$('#dr-body [data-act]').forEach(b => b.onclick = () => accion(b.dataset.act, b.dataset.id || id, b.dataset.homSel));
     $$('#dr-body [data-asignar]').forEach(b => b.onclick = () => asignarDocente(b.dataset.id || id, b.dataset.asignar));
     $$('#dr-body [data-cont-id]').forEach(b => b.onclick = () => asignarPorContinuidad(b.dataset.id || id, b.dataset.contId, b.dataset.contNom, b.dataset.contTipo));
