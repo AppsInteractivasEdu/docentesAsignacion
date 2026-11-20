@@ -1,4 +1,7 @@
 /* Usuarios iniciales de la aplicación (solo se guardan hashes SHA-256 con sal, no las contraseñas). Se incorporan al iniciar si aún no existen en el navegador. */
 window.USUARIOS_BASE = [{"usuario":"rolando escorcia","nombre":"Rolando Escorcia Caballero","rol":"admin","salt":"e93be6920ebb050a","hash":"e6474e7c3decef3610ed1250cc461334ddee229c8eeb22e399c446446abc4e0b","creado":1792526821869},
   {"usuario":"gleider carranza","nombre":"Gleider Carranza","rol":"admin","salt":"6aae263c8663b00f","hash":"d8516cc31e4c9d0c8db6060eccda8666adda41181a1e64e9808cf180136d8db3","creado":1792526821869},
-  {"usuario":"vicerrectoriaacademica","nombre":"Vicerrectoría Académica","rol":"consulta","salt":"9b56a2fde9265374","hash":"c297b370a92d75e34591066c48ee33e38b499fb65466e569cae29992e0ee02a7","creado":1794332708172}];
+  {"usuario":"vicerrectoriaacademica","nombre":"Vicerrectoría Académica","rol":"consulta","salt":"9b56a2fde9265374","hash":"c297b370a92d75e34591066c48ee33e38b499fb65466e569cae29992e0ee02a7","creado":1794332708172},
+  {"usuario":"decano@unimagdalena.app","nombre":"Decano","rol":"consulta","salt":"4e95fa1ada3f0b0b","hash":"b9c36422e8860780c4b25c1c3aaf0afc1b43ecfe98d9909c89c8f43fede387e6","creado":1795199129083},
+  {"usuario":"adminpedagogia@unimagdalena.app","nombre":"Administrador Pedagogía","rol":"admin","salt":"a1c75264f78c4db8","hash":"0768ef3372432382e43297d295a835d99a5135eba87ad7ac64f2cc1826de5cec","creado":1795199129084},
+  {"usuario":"viceacademica@unimagdalena.app","nombre":"Vicerrectoría Académica","rol":"consulta","salt":"502c618f9d431bd6","hash":"cbc4ce6f5e7e3a8ab4dbf06d1d4c100bb248212c8345d8de977933e29e263078","creado":1795199129085}];
