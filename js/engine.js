@@ -1136,8 +1136,14 @@
     const extDe = id => ext.get(cedula(id)) || 0;
     const cargaTot = id => (carga.get(id) || 0) + extDe(id);
     const esPPIc = c => c.componente === COMP.PPI;
+    // Para continuidad/progresión: solo se trata como "práctica" en serio si, además del componente,
+    // el nombre de la asignatura corresponde a un nivel reconocible (PPI I..VI / Práctica Profesional).
+    // Evita que asignaturas mal clasificadas como PPI en el plan (p. ej. "Matemáticas" o "Estadística I"
+    // bajo Lenguas Extranjeras, ya señaladas con "revisar clasificación") pierdan toda continuidad real
+    // solo por quedar atrapadas en la regla de "solo progresión por nivel" sin tener ese nivel.
+    const esPPIReal = c => esPPIc(c) && nivelPPI(c.asignatura) != null;
     const mismaAsig = (c, h) => {
-      if (esPPIc(c)) return h.nivel != null && h.nivel === nivelPPI(c.asignatura);
+      if (esPPIReal(c)) return h.nivel != null && h.nivel === nivelPPI(c.asignatura);
       const a = tokens(c.asignatura);
       // Umbral bajado de 0.8 a 0.7: con 0.8 variaciones menores de redacción entre el plan y el Excel
       // 2026-II (p.ej. un adjetivo de más) hacían perder antecedentes reales, no por falta de dato sino
@@ -1147,7 +1153,7 @@
     const preferidos = c => {
       const rows = histPorProg.get(progN(c.programa)) || [];
       const out = [];
-      if (esPPIc(c)) {
+      if (esPPIReal(c)) {
         // En PPI no existe "continuidad" (repetir el mismo nivel): el docente siempre avanza al
         // siguiente nivel (I→II→…→VI/Práctica Profesional→I de nuevo). Por eso aquí solo se busca
         // quien dictó el nivel ANTERIOR en 2026-II — nunca el mismo nivel de esta asignatura.
@@ -1177,7 +1183,7 @@
       else if (r.docenteId) return;
       const f = r.f7;
       if (h > cfg.maxHoras) { r.excedeTope = true; return; }
-      const ppi = esPPIc(c);
+      const ppi = esPPIReal(c);
       const cabe = x => cargaTot(x.id) + h <= cfg.maxHoras;
       let elegible = null;
       let sinFicha = null; // mejor candidato de continuidad/progresión sin ficha en la base, como respaldo
@@ -1298,12 +1304,12 @@
       const rowsP = histPorProg.get(progN(c.programa)) || [];
       // Para continuidad (no para PPI, ver nota junto a filasFacultad más arriba) también se
       // busca antecedente entre las filas de "Facultad Ciencias de la Educación".
-      const rowsBusqueda = esPPIc(c) ? rowsP : rowsP.concat(filasFacultad);
+      const rowsBusqueda = esPPIReal(c) ? rowsP : rowsP.concat(filasFacultad);
       f.prev26 = [...new Set(rowsBusqueda.filter(x => mismaAsig(c, x)).map(x => x.nombre))];
       f.tipo = prof ? 'nueva' : 'pendiente'; f.origen = null;
       if (prof && hist.length) {
         const mine = rowsBusqueda.filter(x => x.id === prof.id);
-        if (esPPIc(c)) {
+        if (esPPIReal(c)) {
           // Sin "continuidad" para PPI (ver nota en preferidos()): solo progresión desde el nivel anterior.
           const l = nivelPPI(c.asignatura), prev = l === 1 ? 6 : l - 1;
           const hp = l && mine.find(x => x.nivel === prev);
@@ -1313,7 +1319,7 @@
         // Caso especial de continuidad sin ficha en la base: el tipo y el antecedente ya se fijaron
         // al proponer al docente (pasada 1); aquí solo se trasladan a f.tipo/f.origen.
         f.tipo = f.tipoSinFicha; f.origen = f.origenSinFicha;
-        if (esPPIc(c) && f.tipoSinFicha === 'progresión') {
+        if (esPPIReal(c) && f.tipoSinFicha === 'progresión') {
           const l = nivelPPI(c.asignatura);
           f.nivelOrigen = f.origenSinFicha ? f.origenSinFicha.nivel : null; f.nivelDestino = l;
         }

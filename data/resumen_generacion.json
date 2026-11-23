@@ -1,5 +1,5 @@
 {
- "fecha": "2026-11-19T19:09:42.470Z",
+ "fecha": "2026-11-23T02:55:59.334Z",
  "stats": {
   "programas": 11,
   "total": 356,
@@ -9,17 +9,17 @@
    "Práctica Pedagógica Investigativa": 128
   },
   "porEstado": {
-   "Asignación propuesta": 282,
+   "Asignación propuesta": 285,
    "Asignación aprobada": 0,
    "Pendiente por designar": 21,
-   "Perfil no disponible": 21,
+   "Perfil no disponible": 18,
    "Pendiente de validación": 26,
    "Pendiente de validación documental": 0,
    "Pendiente de autorización del Director": 6
   },
-  "conDocente": 308,
+  "conDocente": 311,
   "pendientes": 21,
-  "sinPerfil": 21,
+  "sinPerfil": 18,
   "pctAprobadas": 0,
   "porPrograma": [
    {
@@ -103,14 +103,14 @@
     "Pedagógico": 14,
     "Didáctica de las Disciplinas": 7,
     "Práctica Pedagógica Investigativa": 15,
-    "Asignación propuesta": 30,
+    "Asignación propuesta": 33,
     "Asignación aprobada": 0,
     "Pendiente por designar": 2,
-    "Perfil no disponible": 4,
+    "Perfil no disponible": 1,
     "Pendiente de validación": 0,
     "Pendiente de validación documental": 0,
     "Pendiente de autorización del Director": 0,
-    "conDocente": 30
+    "conDocente": 33
    },
    {
     "programa": "Licenciatura en Literatura y Lengua Castellana",
@@ -188,7 +188,7 @@
     "conDocente": 26
    }
   ],
-  "docentes": 146
+  "docentes": 147
  },
  "qa": [
   {
@@ -229,7 +229,7 @@
   {
    "nombre": "Ningún docente supera el tope de 8 h",
    "estado": "Cumple",
-   "detalle": "146 docentes con carga asignada."
+   "detalle": "147 docentes con carga asignada."
   },
   {
    "nombre": "No hay asignaturas duplicadas en los planes",
@@ -292,7 +292,7 @@
    "detalle": "Licenciatura en Artes · 22 perfiles (Firestore: perfilesPublicos)",
    "filas": 22,
    "tamano": 99807,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "bc670be5e11a1cfe"
   },
   {
@@ -301,7 +301,7 @@
    "detalle": "Licenciatura en Ciencias Naturales y Educación Ambiental · 22 perfiles (Firestore: perfilesPublicos)",
    "filas": 22,
    "tamano": 106848,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "db5bbda8db422e19"
   },
   {
@@ -310,7 +310,7 @@
    "detalle": "Licenciatura en Educación Campesina y Rural · 32 perfiles (Firestore: perfilesPublicos)",
    "filas": 32,
    "tamano": 101994,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "d5e8e1b41c0c7409"
   },
   {
@@ -319,7 +319,7 @@
    "detalle": "Licenciatura en Educación Infantil · 20 perfiles (Firestore: perfilesPublicos)",
    "filas": 20,
    "tamano": 104379,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "07c988b19db505e5"
   },
   {
@@ -328,17 +328,17 @@
    "detalle": "Licenciatura en Etnoeducación · 24 perfiles (Firestore: perfilesPublicos)",
    "filas": 24,
    "tamano": 105155,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "777b998a180440a8"
   },
   {
    "tipo": "Perfiles docentes",
    "nombre": "perfilesPublicos:lenguas-extranjeras",
-   "detalle": "Licenciatura en Lenguas Extranjeras con Énfasis en Inglés · 25 perfiles (Firestore: perfilesPublicos)",
-   "filas": 25,
-   "tamano": 88824,
-   "cargado": "2026-11-19T19:09:42.470Z",
-   "huella": "75f27bd188acec42"
+   "detalle": "Licenciatura en Lenguas Extranjeras con Énfasis en Inglés · 28 perfiles (Firestore: perfilesPublicos)",
+   "filas": 28,
+   "tamano": 107020,
+   "cargado": "2026-11-23T02:55:59.334Z",
+   "huella": "48c5d842608dc02c"
   },
   {
    "tipo": "Perfiles docentes",
@@ -346,7 +346,7 @@
    "detalle": "Licenciatura en Literatura y Lengua Castellana · 26 perfiles (Firestore: perfilesPublicos)",
    "filas": 26,
    "tamano": 87423,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "7d84282033d31f78"
   },
   {
@@ -355,7 +355,7 @@
    "detalle": "Licenciatura en Matemáticas · 27 perfiles (Firestore: perfilesPublicos)",
    "filas": 27,
    "tamano": 85891,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "48193fe930ad55e3"
   },
   {
@@ -364,7 +364,7 @@
    "detalle": "Licenciatura en Química · 23 perfiles (Firestore: perfilesPublicos)",
    "filas": 23,
    "tamano": 75815,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "21bf569b660e9991"
   },
   {
@@ -373,7 +373,7 @@
    "detalle": "Licenciatura en Tecnología · 19 perfiles (Firestore: perfilesPublicos)",
    "filas": 19,
    "tamano": 67996,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "94c36085e75d9350"
   },
   {
@@ -382,7 +382,7 @@
    "detalle": "hoja \"Report\" · 66951 registros · 2991 personas",
    "filas": 66951,
    "tamano": 5025856,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "289bc4dbcd5d64e8"
   },
   {
@@ -391,7 +391,7 @@
    "detalle": "hoja \"Report\" · 9159 títulos · 2995 personas",
    "filas": 2995,
    "tamano": 1451379,
-   "cargado": "2026-11-19T19:09:42.470Z",
+   "cargado": "2026-11-23T02:55:59.334Z",
    "huella": "354c29172cc8e02b"
   }
  ]
